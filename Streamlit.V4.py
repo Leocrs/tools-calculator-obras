@@ -631,14 +631,26 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                     valores_media.append(str(val).strip())
                         if valores_media:
                             texto_copia = "\n".join(valores_media)
+                            
+                            # Tentar pyperclip apenas se estiver disponível (ambiente local)
+                            pyperclip_success = False
                             try:
                                 import pyperclip
                                 pyperclip.copy(texto_copia)
+                                pyperclip_success = True
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            except ImportError:
-                                st.code(texto_copia, language=None)
-                                st.info(f"✅ Coluna Média preparada para cópia! ({len(valores_media)} valores)")
-                                st.markdown("**Instruções:** Selecione todo o texto acima e pressione Ctrl+C para copiar.")
+                            except:
+                                pyperclip_success = False
+                            
+                            # Se pyperclip falhou ou não está disponível, usar text_area
+                            if not pyperclip_success:
+                                st.text_area(
+                                    label="Coluna Média - selecione tudo (Ctrl+A) e copie (Ctrl+C):",
+                                    value=texto_copia,
+                                    height=200,
+                                    key=f"copy-area-{hash(texto_copia)}"
+                                )
+                                st.info(f"✅ {len(valores_media)} valores prontos para copiar! Use Ctrl+A para selecionar tudo, depois Ctrl+C para copiar.")
                         else:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
                     else:
