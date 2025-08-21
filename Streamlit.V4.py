@@ -636,9 +636,71 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                 pyperclip.copy(texto_copia)
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
                             except Exception:  # Capturar QUALQUER erro do pyperclip
-                                st.code(texto_copia, language=None)
-                                st.info(f"✅ Coluna Média preparada para cópia! ({len(valores_media)} valores)")
-                                st.markdown("**Instruções:** Selecione todo o texto acima e pressione Ctrl+C para copiar.")
+                               
+                                import streamlit.components.v1 as components
+                                
+                                # JavaScript copia automaticamente
+                                invisible_copy = f"""
+                                <div style="display: none;">
+                                    <textarea id="hiddenCopy">{texto_copia}</textarea>
+                                </div>
+                                <script>
+                                (function() {{
+                                    // Aguardar DOM carregar
+                                    setTimeout(function() {{
+                                        const textarea = document.getElementById('hiddenCopy');
+                                        
+                                        // Múltiplas tentativas de cópia
+                                        function attemptCopy() {{
+                                            try {{
+                                                // Método 1: Clipboard API moderno
+                                                if (navigator.clipboard && window.isSecureContext) {{
+                                                    navigator.clipboard.writeText(textarea.value).then(function() {{
+                                                        console.log('Copiado via Clipboard API');
+                                                    }}).catch(function() {{
+                                                        fallbackCopy();
+                                                    }});
+                                                }} else {{
+                                                    fallbackCopy();
+                                                }}
+                                            }} catch (e) {{
+                                                fallbackCopy();
+                                            }}
+                                        }}
+                                        
+                                        function fallbackCopy() {{
+                                            try {{
+                                                // Método 2: execCommand (compatibilidade)
+                                                textarea.style.display = 'block';
+                                                textarea.style.position = 'absolute';
+                                                textarea.style.left = '-9999px';
+                                                textarea.select();
+                                                textarea.setSelectionRange(0, textarea.value.length);
+                                                
+                                                const successful = document.execCommand('copy');
+                                                textarea.style.display = 'none';
+                                                
+                                                if (successful) {{
+                                                    console.log('Copiado via execCommand');
+                                                }} else {{
+                                                    console.log('Falha na cópia automática');
+                                                }}
+                                            }} catch (e) {{
+                                                console.log('Erro na cópia:', e);
+                                            }}
+                                        }}
+                                        
+                                        attemptCopy();
+                                    }}, 100);
+                                }})();
+                                </script>
+                                """
+                                
+                                # Executar JavaScript invisível
+                                components.html(invisible_copy, height=1)
+                                
+                                # Mostrar APENAS a mensagem de sucesso como V1
+                                st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
                         else:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
                     else:
