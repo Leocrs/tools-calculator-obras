@@ -9,5 +9,3 @@ xlrd
 xlutils
 python-dateutil
 numpy
-io
-os
