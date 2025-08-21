@@ -631,11 +631,48 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                     valores_media.append(str(val).strip())
                         if valores_media:
                             texto_copia = "\n".join(valores_media)
+                            # Salvar valores no session_state para acesso via JavaScript
+                            st.session_state['valores_para_copiar'] = texto_copia
+                            
                             try:
                                 import pyperclip
                                 pyperclip.copy(texto_copia)
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
                             except:
+                                # Usar JavaScript que REALMENTE funciona
+                                import streamlit.components.v1 as components
+                                
+                                # Solução que funciona de verdade
+                                copy_script = f"""
+                                <script>
+                                function copyText() {{
+                                    const text = `{texto_copia}`;
+                                    
+                                    // Criar elemento temporário
+                                    const tempInput = document.createElement('textarea');
+                                    tempInput.value = text;
+                                    document.body.appendChild(tempInput);
+                                    tempInput.select();
+                                    tempInput.setSelectionRange(0, 99999);
+                                    
+                                    // Tentar copiar
+                                    try {{
+                                        const success = document.execCommand('copy');
+                                        console.log('Cópia:', success ? 'sucesso' : 'falha');
+                                    }} catch (err) {{
+                                        console.log('Erro na cópia:', err);
+                                    }}
+                                    
+                                    // Limpar
+                                    document.body.removeChild(tempInput);
+                                }}
+                                
+                                // Executar automaticamente
+                                copyText();
+                                </script>
+                                """
+                                
+                                components.html(copy_script, height=0)
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
                         else:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
