@@ -8,3 +8,4 @@ xlrd
 xlutils
 python-dateutil
 numpy
+pyperclip
