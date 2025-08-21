@@ -3,3 +3,11 @@ pandas
 pymongo
 requests
 openpyxl
+pyperclip
+xlsxwriter
+xlrd
+xlutils
+python-dateutil
+numpy
+io
+os
