@@ -592,6 +592,20 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                 column_config=column_config,
                 disabled=[col for col in df_matriz_exibir.columns if col != "Selecionar"]
             )
+            
+            # DEBUG: Verificar estado após data_editor
+            st.write("🔍 **DEBUG - Estado após data_editor:**")
+            st.write(f"- df_matriz_editada shape: {df_matriz_editada.shape}")
+            st.write(f"- df_matriz_editada columns: {list(df_matriz_editada.columns)}")
+            if 'Selecionar' in df_matriz_editada.columns:
+                selecionadas = df_matriz_editada['Selecionar'].sum()
+                st.write(f"- Linhas selecionadas: {selecionadas}")
+                primeiras_selecoes = df_matriz_editada['Selecionar'].head(10).tolist()
+                st.write(f"- Primeiras 10 seleções: {primeiras_selecoes}")
+            
+            # Atualizar df_matriz_exibir com os dados editados
+            df_matriz_exibir = df_matriz_editada.copy()
+            
             if "Selecionar" in df_matriz_editada.columns:
                 nova_selecao = st.session_state['selecao_linhas'][:]
                 for idx in idx_checkbox:
@@ -620,17 +634,55 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                 salvar_eap_na_area_de_trabalho()
             def copiar_coluna_media():
                 try:
+                    # DEBUG: Verificar se colunas existem
+                    st.write("🔍 **DEBUG - Verificando colunas:**")
+                    st.write(f"- Colunas disponíveis em df_matriz: {list(df_matriz.columns)}")
+                    st.write(f"- Colunas disponíveis em df_matriz_exibir: {list(df_matriz_exibir.columns)}")
+                    st.write(f"- 'Média' in df_matriz.columns: {'Média' in df_matriz.columns}")
+                    st.write(f"- 'Selecionar' in df_matriz_exibir.columns: {'Selecionar' in df_matriz_exibir.columns}")
+                    
                     if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
                         valores_media = []
+                        linhas_selecionadas = 0
+                        linhas_com_valor = 0
+                        
+                        # DEBUG: Processar linha por linha
+                        st.write("🔍 **DEBUG - Processando linhas:**")
                         for idx, row in df_matriz_exibir.iterrows():
                             if idx < 2:
+                                st.write(f"- Linha {idx}: Pulada (cabeçalho)")
                                 continue
-                            if row["Selecionar"]:
-                                val = row["Média"]
-                                if val and str(val).strip() and str(val).strip() != "":
-                                    valores_media.append(str(val).strip())
+                            
+                            selecionada = row["Selecionar"]
+                            valor_media = row["Média"]
+                            
+                            if selecionada:
+                                linhas_selecionadas += 1
+                                st.write(f"- Linha {idx}: SELECIONADA - Valor: '{valor_media}'")
+                                
+                                if valor_media and str(valor_media).strip() and str(valor_media).strip() != "":
+                                    linhas_com_valor += 1
+                                    valores_media.append(str(valor_media).strip())
+                                    st.write(f"  ✅ Valor adicionado: '{str(valor_media).strip()}'")
+                                else:
+                                    st.write(f"  ❌ Valor vazio/inválido")
+                            else:
+                                if idx < 10:  # Mostrar apenas primeiras 10 para não poluir
+                                    st.write(f"- Linha {idx}: não selecionada")
+                        
+                        st.write(f"🔍 **DEBUG - Resumo:**")
+                        st.write(f"- Total de linhas selecionadas: {linhas_selecionadas}")
+                        st.write(f"- Linhas com valor válido: {linhas_com_valor}")
+                        st.write(f"- Total de valores coletados: {len(valores_media)}")
+                        
                         if valores_media:
                             texto_copia = "\n".join(valores_media)
+                            st.write(f"- Texto final tem {len(texto_copia)} caracteres")
+                            
+                            # DEBUG: Mostrar primeiros valores
+                            st.write("🔍 **DEBUG - Primeiros valores:**")
+                            primeiros = valores_media[:5]
+                            st.write(f"- Primeiros 5 valores: {primeiros}")
                             
                             # Tentar pyperclip apenas se estiver disponível (ambiente local)
                             pyperclip_success = False
@@ -639,24 +691,26 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                 pyperclip.copy(texto_copia)
                                 pyperclip_success = True
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            except:
+                                st.write("🔍 **DEBUG:** pyperclip funcionou!")
+                            except Exception as e:
                                 pyperclip_success = False
+                                st.write(f"🔍 **DEBUG:** pyperclip falhou - {e}")
                             
-                            # Se pyperclip falhou ou não está disponível, usar text_area
+                            # Se pyperclip falhou ou não está disponível, usar st.code
                             if not pyperclip_success:
-                                st.text_area(
-                                    label="Coluna Média - selecione tudo (Ctrl+A) e copie (Ctrl+C):",
-                                    value=texto_copia,
-                                    height=200,
-                                    key=f"copy-area-{hash(texto_copia)}"
-                                )
-                                st.info(f"✅ {len(valores_media)} valores prontos para copiar! Use Ctrl+A para selecionar tudo, depois Ctrl+C para copiar.")
+                                st.write("🔍 **DEBUG:** Usando fallback st.code")
+                                st.code(texto_copia, language=None)
+                                st.info(f"✅ Coluna Média preparada para cópia! ({len(valores_media)} valores)")
+                                st.markdown("**Instruções:** Selecione todo o texto acima e pressione Ctrl+C para copiar.")
                         else:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
+                            st.write("🔍 **DEBUG:** Lista valores_media está vazia!")
                     else:
                         st.error("Coluna Média ou coluna Selecionar não encontrada.")
+                        st.write("🔍 **DEBUG:** Condição das colunas falhou!")
                 except Exception as e:
                     st.error(f"Erro ao preparar coluna Média: {e}")
+                    st.write(f"🔍 **DEBUG:** Exception capturada: {type(e).__name__}: {e}")
             if st.button("Copiar coluna Média", key="copiar-coluna-media-eap"):
                 copiar_coluna_media()
         else:
