@@ -592,10 +592,6 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                 column_config=column_config,
                 disabled=[col for col in df_matriz_exibir.columns if col != "Selecionar"]
             )
-            
-            # Atualizar df_matriz_exibir com os dados editados
-            df_matriz_exibir = df_matriz_editada.copy()
-            
             if "Selecionar" in df_matriz_editada.columns:
                 nova_selecao = st.session_state['selecao_linhas'][:]
                 for idx in idx_checkbox:
@@ -607,21 +603,14 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             buffer = io.BytesIO()
             df_matriz.to_excel(buffer, index=False, engine='openpyxl')
             dados_bytes = buffer.getvalue()
-            def salvar_eap_na_area_de_trabalho():
-                try:
-                    user_home = os.path.expanduser('~')
-                    onedrive_desktop = os.path.join(user_home, 'OneDrive', 'Desktop')
-                    desktop = onedrive_desktop if os.path.exists(onedrive_desktop) else os.path.join(user_home, 'Desktop')
-                    if not os.path.exists(desktop):
-                        os.makedirs(desktop, exist_ok=True)
-                    caminho_arquivo = os.path.join(desktop, "matriz_eap.xlsx")
-                    with open(caminho_arquivo, "wb") as f:
-                        f.write(dados_bytes)
-                    st.success(f"Arquivo salvo na área de trabalho: {caminho_arquivo}")
-                except Exception as e:
-                    st.error(f"Erro ao salvar na área de trabalho: {e}")
-            if st.button("Salvar na área de trabalho (Excel)", key="salvar-area-trabalho-eap-excel"):
-                salvar_eap_na_area_de_trabalho()
+            # Download direto para o usuário, que pode escolher salvar na área de trabalho
+            st.download_button(
+                label="Salvar na área de trabalho (Excel)",
+                data=dados_bytes,
+                file_name="matriz_eap.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="salvar-area-trabalho-eap-excel"
+            )
             def copiar_coluna_media():
                 try:
                     if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
@@ -635,116 +624,14 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                     valores_media.append(str(val).strip())
                         if valores_media:
                             texto_copia = "\n".join(valores_media)
-                            
-                            # Tentar pyperclip primeiro (ambiente local)
-                            pyperclip_success = False
                             try:
                                 import pyperclip
                                 pyperclip.copy(texto_copia)
-                                pyperclip_success = True
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            except:
-                                pass
-                            
-                            # Se pyperclip não funcionou, usar solução web funcional
-                            if not pyperclip_success:
-                                # Criar um botão invisível que copia quando clicado
-                                import streamlit.components.v1 as components
-                                
-                                # HTML/JavaScript mais robusto para cópia
-                                copy_html = f"""
-                                <div style="position: relative;">
-                                    <textarea 
-                                        id="copyText" 
-                                        style="position: absolute; left: -9999px; top: -9999px; opacity: 0;"
-                                        readonly
-                                    >{texto_copia}</textarea>
-                                    
-                                    <button 
-                                        id="copyBtn" 
-                                        onclick="copyToClipboard()" 
-                                        style="
-                                            background: #00cc88; 
-                                            color: white; 
-                                            border: none; 
-                                            padding: 10px 20px; 
-                                            border-radius: 5px; 
-                                            cursor: pointer;
-                                            font-weight: bold;
-                                            margin: 10px 0;
-                                        "
-                                    >
-                                        🔥 CLIQUE AQUI PARA COPIAR OS {len(valores_media)} VALORES
-                                    </button>
-                                    
-                                    <div id="status" style="margin-top: 10px; font-weight: bold;"></div>
-                                </div>
-                                
-                                <script>
-                                function copyToClipboard() {{
-                                    const textArea = document.getElementById('copyText');
-                                    const btn = document.getElementById('copyBtn');
-                                    const status = document.getElementById('status');
-                                    
-                                    try {{
-                                        // Método 1: Modern Clipboard API
-                                        if (navigator.clipboard) {{
-                                            navigator.clipboard.writeText(textArea.value).then(function() {{
-                                                status.innerHTML = '✅ COPIADO! Cole com Ctrl+V onde precisar!';
-                                                status.style.color = 'green';
-                                                btn.innerHTML = '✅ VALORES COPIADOS!';
-                                                btn.style.background = '#28a745';
-                                            }}).catch(function() {{
-                                                // Fallback se Clipboard API falhar
-                                                fallbackCopy();
-                                            }});
-                                        }} else {{
-                                            fallbackCopy();
-                                        }}
-                                    }} catch (err) {{
-                                        fallbackCopy();
-                                    }}
-                                    
-                                    function fallbackCopy() {{
-                                        textArea.style.position = 'static';
-                                        textArea.style.opacity = '1';
-                                        textArea.style.left = '0';
-                                        textArea.style.top = '0';
-                                        textArea.focus();
-                                        textArea.select();
-                                        textArea.setSelectionRange(0, textArea.value.length);
-                                        
-                                        try {{
-                                            const successful = document.execCommand('copy');
-                                            if (successful) {{
-                                                status.innerHTML = '✅ COPIADO! Cole com Ctrl+V onde precisar!';
-                                                status.style.color = 'green';
-                                                btn.innerHTML = '✅ VALORES COPIADOS!';
-                                                btn.style.background = '#28a745';
-                                                textArea.style.position = 'absolute';
-                                                textArea.style.opacity = '0';
-                                                textArea.style.left = '-9999px';
-                                                textArea.style.top = '-9999px';
-                                            }} else {{
-                                                throw new Error('execCommand failed');
-                                            }}
-                                        }} catch (err) {{
-                                            status.innerHTML = '⚠️ Selecione todo o texto abaixo e pressione Ctrl+C';
-                                            status.style.color = 'orange';
-                                            btn.style.display = 'none';
-                                        }}
-                                    }}
-                                }}
-                                
-                                // Auto-executar após carregar
-                                setTimeout(function() {{
-                                    copyToClipboard();
-                                }}, 500);
-                                </script>
-                                """
-                                
-                                components.html(copy_html, height=150)
-                                
+                            except ImportError:
+                                st.code(texto_copia, language=None)
+                                st.info(f"✅ Coluna Média preparada para cópia! ({len(valores_media)} valores)")
+                                st.markdown("**Instruções:** Selecione todo o texto acima e pressione Ctrl+C para copiar.")
                         else:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
                     else:
