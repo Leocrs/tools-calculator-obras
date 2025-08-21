@@ -635,7 +635,7 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                 import pyperclip
                                 pyperclip.copy(texto_copia)
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            except ImportError:
+                            except Exception:  # Capturar QUALQUER erro do pyperclip
                                 st.code(texto_copia, language=None)
                                 st.info(f"✅ Coluna Média preparada para cópia! ({len(valores_media)} valores)")
                                 st.markdown("**Instruções:** Selecione todo o texto acima e pressione Ctrl+C para copiar.")
