@@ -631,14 +631,63 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                     valores_media.append(str(val).strip())
                         if valores_media:
                             texto_copia = "\n".join(valores_media)
+                            
                             try:
                                 import pyperclip
                                 pyperclip.copy(texto_copia)
+                                copied = True
+                            except:
+                                copied = False
+                            
+                            if copied:
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            except Exception:  # Captura qualquer erro do pyperclip
-                                st.code(texto_copia, language=None)
-                                st.info(f"✅ Coluna Média preparada para cópia! ({len(valores_media)} valores)")
-                                st.markdown("**Instruções:** Selecione todo o texto acima e pressione Ctrl+C para copiar.")
+                            else:
+                                import streamlit.components.v1 as components
+                                
+                                copy_component = f"""
+                                <div style="text-align: center;">
+                                    <button onclick="copyText()" style="
+                                        background: #00cc88;
+                                        color: white;
+                                        border: none;
+                                        padding: 10px 20px;
+                                        border-radius: 5px;
+                                        cursor: pointer;
+                                        font-weight: bold;
+                                    ">Copiar {len(valores_media)} valores</button>
+                                    <div id="status" style="margin-top: 10px;"></div>
+                                </div>
+                                <textarea id="copyData" readonly style="position: absolute; left: -9999px;">{texto_copia}</textarea>
+                                <script>
+                                function copyText() {{
+                                    const textarea = document.getElementById('copyData');
+                                    const status = document.getElementById('status');
+                                    
+                                    textarea.style.position = 'static';
+                                    textarea.style.opacity = '1';
+                                    textarea.focus();
+                                    textarea.select();
+                                    
+                                    try {{
+                                        const success = document.execCommand('copy');
+                                        if (success) {{
+                                            status.innerHTML = '✅ Copiado! Cole com Ctrl+V';
+                                            status.style.color = '#28a745';
+                                        }} else {{
+                                            throw new Error('Falha na cópia');
+                                        }}
+                                    }} catch (err) {{
+                                        status.innerHTML = 'Use Ctrl+C para copiar';
+                                        status.style.color = '#ffc107';
+                                    }}
+                                    
+                                    textarea.style.position = 'absolute';
+                                    textarea.style.opacity = '0';
+                                }}
+                                </script>
+                                """
+                                
+                                components.html(copy_component, height=100)
                         else:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
                     else:
