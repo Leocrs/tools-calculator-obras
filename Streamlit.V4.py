@@ -642,39 +642,109 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                 import pyperclip
                                 pyperclip.copy(texto_copia)
                                 pyperclip_success = True
+                                st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
                             except:
                                 pass
                             
-                            if pyperclip_success:
-                                # Comportamento igual V1 - só mensagem de sucesso
-                                st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            else:
-                                # Para ambiente web - usar JavaScript para copiar
+                            # Se pyperclip não funcionou, usar solução web funcional
+                            if not pyperclip_success:
+                                # Criar um botão invisível que copia quando clicado
                                 import streamlit.components.v1 as components
                                 
-                                # JavaScript para copiar automaticamente
-                                copy_js = f"""
+                                # HTML/JavaScript mais robusto para cópia
+                                copy_html = f"""
+                                <div style="position: relative;">
+                                    <textarea 
+                                        id="copyText" 
+                                        style="position: absolute; left: -9999px; top: -9999px; opacity: 0;"
+                                        readonly
+                                    >{texto_copia}</textarea>
+                                    
+                                    <button 
+                                        id="copyBtn" 
+                                        onclick="copyToClipboard()" 
+                                        style="
+                                            background: #00cc88; 
+                                            color: white; 
+                                            border: none; 
+                                            padding: 10px 20px; 
+                                            border-radius: 5px; 
+                                            cursor: pointer;
+                                            font-weight: bold;
+                                            margin: 10px 0;
+                                        "
+                                    >
+                                        🔥 CLIQUE AQUI PARA COPIAR OS {len(valores_media)} VALORES
+                                    </button>
+                                    
+                                    <div id="status" style="margin-top: 10px; font-weight: bold;"></div>
+                                </div>
+                                
                                 <script>
-                                async function copyToClipboard() {{
+                                function copyToClipboard() {{
+                                    const textArea = document.getElementById('copyText');
+                                    const btn = document.getElementById('copyBtn');
+                                    const status = document.getElementById('status');
+                                    
                                     try {{
-                                        const text = `{texto_copia}`;
-                                        await navigator.clipboard.writeText(text);
-                                        console.log('Texto copiado para clipboard via JavaScript');
-                                        return true;
+                                        // Método 1: Modern Clipboard API
+                                        if (navigator.clipboard) {{
+                                            navigator.clipboard.writeText(textArea.value).then(function() {{
+                                                status.innerHTML = '✅ COPIADO! Cole com Ctrl+V onde precisar!';
+                                                status.style.color = 'green';
+                                                btn.innerHTML = '✅ VALORES COPIADOS!';
+                                                btn.style.background = '#28a745';
+                                            }}).catch(function() {{
+                                                // Fallback se Clipboard API falhar
+                                                fallbackCopy();
+                                            }});
+                                        }} else {{
+                                            fallbackCopy();
+                                        }}
                                     }} catch (err) {{
-                                        console.log('Erro ao copiar via JavaScript:', err);
-                                        return false;
+                                        fallbackCopy();
+                                    }}
+                                    
+                                    function fallbackCopy() {{
+                                        textArea.style.position = 'static';
+                                        textArea.style.opacity = '1';
+                                        textArea.style.left = '0';
+                                        textArea.style.top = '0';
+                                        textArea.focus();
+                                        textArea.select();
+                                        textArea.setSelectionRange(0, textArea.value.length);
+                                        
+                                        try {{
+                                            const successful = document.execCommand('copy');
+                                            if (successful) {{
+                                                status.innerHTML = '✅ COPIADO! Cole com Ctrl+V onde precisar!';
+                                                status.style.color = 'green';
+                                                btn.innerHTML = '✅ VALORES COPIADOS!';
+                                                btn.style.background = '#28a745';
+                                                textArea.style.position = 'absolute';
+                                                textArea.style.opacity = '0';
+                                                textArea.style.left = '-9999px';
+                                                textArea.style.top = '-9999px';
+                                            }} else {{
+                                                throw new Error('execCommand failed');
+                                            }}
+                                        }} catch (err) {{
+                                            status.innerHTML = '⚠️ Selecione todo o texto abaixo e pressione Ctrl+C';
+                                            status.style.color = 'orange';
+                                            btn.style.display = 'none';
+                                        }}
                                     }}
                                 }}
-                                copyToClipboard();
+                                
+                                // Auto-executar após carregar
+                                setTimeout(function() {{
+                                    copyToClipboard();
+                                }}, 500);
                                 </script>
                                 """
                                 
-                                # Executar JavaScript
-                                components.html(copy_js, height=0)
+                                components.html(copy_html, height=150)
                                 
-                                # Mostrar mensagem de sucesso igual V1
-                                st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
                         else:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
                     else:
