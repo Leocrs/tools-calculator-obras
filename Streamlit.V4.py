@@ -603,14 +603,21 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             buffer = io.BytesIO()
             df_matriz.to_excel(buffer, index=False, engine='openpyxl')
             dados_bytes = buffer.getvalue()
-            # Download direto para o usuário, que pode escolher salvar na área de trabalho
-            st.download_button(
-                label="Salvar na área de trabalho (Excel)",
-                data=dados_bytes,
-                file_name="matriz_eap.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="salvar-area-trabalho-eap-excel"
-            )
+            def salvar_eap_na_area_de_trabalho():
+                try:
+                    user_home = os.path.expanduser('~')
+                    onedrive_desktop = os.path.join(user_home, 'OneDrive', 'Desktop')
+                    desktop = onedrive_desktop if os.path.exists(onedrive_desktop) else os.path.join(user_home, 'Desktop')
+                    if not os.path.exists(desktop):
+                        os.makedirs(desktop, exist_ok=True)
+                    caminho_arquivo = os.path.join(desktop, "matriz_eap.xlsx")
+                    with open(caminho_arquivo, "wb") as f:
+                        f.write(dados_bytes)
+                    st.success(f"Arquivo salvo na área de trabalho: {caminho_arquivo}")
+                except Exception as e:
+                    st.error(f"Erro ao salvar na área de trabalho: {e}")
+            if st.button("Salvar na área de trabalho (Excel)", key="salvar-area-trabalho-eap-excel"):
+                salvar_eap_na_area_de_trabalho()
             def copiar_coluna_media():
                 try:
                     if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
