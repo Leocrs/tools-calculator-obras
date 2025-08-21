@@ -627,67 +627,22 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                 continue
                             if row["Selecionar"]:
                                 val = row["Média"]
-                                if val and str(val).strip() and str(val).strip() != "":
+                                if val and str(val).strip():
                                     valores_media.append(str(val).strip())
                         if valores_media:
                             texto_copia = "\n".join(valores_media)
-                            
                             try:
                                 import pyperclip
                                 pyperclip.copy(texto_copia)
-                                copied = True
-                            except:
-                                copied = False
-                            
-                            if copied:
                                 st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            else:
+                            except:
                                 import streamlit.components.v1 as components
-                                
-                                copy_component = f"""
-                                <div style="text-align: center;">
-                                    <button onclick="copyText()" style="
-                                        background: #00cc88;
-                                        color: white;
-                                        border: none;
-                                        padding: 10px 20px;
-                                        border-radius: 5px;
-                                        cursor: pointer;
-                                        font-weight: bold;
-                                    ">Copiar {len(valores_media)} valores</button>
-                                    <div id="status" style="margin-top: 10px;"></div>
-                                </div>
-                                <textarea id="copyData" readonly style="position: absolute; left: -9999px;">{texto_copia}</textarea>
-                                <script>
-                                function copyText() {{
-                                    const textarea = document.getElementById('copyData');
-                                    const status = document.getElementById('status');
-                                    
-                                    textarea.style.position = 'static';
-                                    textarea.style.opacity = '1';
-                                    textarea.focus();
-                                    textarea.select();
-                                    
-                                    try {{
-                                        const success = document.execCommand('copy');
-                                        if (success) {{
-                                            status.innerHTML = '✅ Copiado! Cole com Ctrl+V';
-                                            status.style.color = '#28a745';
-                                        }} else {{
-                                            throw new Error('Falha na cópia');
-                                        }}
-                                    }} catch (err) {{
-                                        status.innerHTML = 'Use Ctrl+C para copiar';
-                                        status.style.color = '#ffc107';
-                                    }}
-                                    
-                                    textarea.style.position = 'absolute';
-                                    textarea.style.opacity = '0';
-                                }}
-                                </script>
-                                """
-                                
-                                components.html(copy_component, height=100)
+                                components.html(f"""
+                                <button onclick="navigator.clipboard.writeText(`{texto_copia}`).then(()=>document.getElementById('msg').innerHTML='✅ Copiado! Cole com Ctrl+V')" 
+                                style="background:#00cc88;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-weight:bold">
+                                Copiar {len(valores_media)} valores</button>
+                                <div id="msg" style="margin-top:10px;font-weight:bold"></div>
+                                """, height=80)
                         else:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
                     else:
