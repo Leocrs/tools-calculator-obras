@@ -9,3 +9,6 @@ xlutils
 python-dateutil
 numpy
 
+
+pyperclip
+
