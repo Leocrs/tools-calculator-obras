@@ -201,8 +201,6 @@ def setup_page():
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
         .stApp {{ background-color: #ffffff !important; color: #262730 !important; }}
-        .main {{ padding-top: 0rem; background-color: #ffffff !important; font-family: "Source Sans 3", sans-serif; }}
-        .block-container {{ background-color: #ffffff !important; padding-top: 0rem; max-width: 100%; }}
         .header-container {{ background: white; padding: 1.5rem 2rem; border-bottom: 1px solid #e5e7eb; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }}
         .tools-title {{ color: #0e938e; font-size: 3rem; font-weight: 700; letter-spacing: -2px; margin: 0; font-family: "Source Sans 3", sans-serif; }}
         .tabs-container {{ border-bottom: 2px solid #0e938e; margin-bottom: 2rem; padding-left: 2rem; }}
@@ -212,26 +210,16 @@ def setup_page():
         .stTextInput > div > div > input {{ border: 1px solid #d1d5db !important; border-radius: 6px !important; background: white !important; font-size: 0.875rem !important; padding: 0.5rem 0.75rem !important; font-family: "Source Sans 3", sans-serif !important; color: #374151 !important; }}
         .stMultiSelect > div > div {{ border: 1px solid #d1d5db !important; border-radius: 6px !important; font-family: "Source Sans 3", sans-serif !important; background: #f9fafb !important; }}
         .stSlider > div > div > div > div {{ background-color: #0e938e !important; }}
-        .metrics-container {{ display: flex; gap: 2rem; margin: 1.5rem 2rem; align-items: flex-start; }}
-        .metric-simple {{ background: #ffffff; border: 2px solid #d1d5db; border-radius: 8px; padding: 1.5rem; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-width: 180px; flex: 1; }}
-        .metric-label {{ color: #6b7280; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 0.75rem; font-family: "Source Sans 3", sans-serif; }}
-        .metric-value {{ color: #1f2937; font-size: 2rem; font-weight: 700; margin: 0; font-family: "Source Sans 3", sans-serif; line-height: 1; }}
-        .table-container {{ margin: 0 2rem; }}
-        button[kind="secondary"] {{ background-color: white !important; border: 1px solid #0e938e !important; color: #0e938e !important; border-radius: 6px !important; }}
         #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}} header {{visibility: hidden;}} .stDeployButton {{visibility: hidden;}}
     </style>
     """, unsafe_allow_html=True)
 
 # ====== RENDERIZAÇÃO DO CABEÇALHO DA PÁGINA ======
 def render_header():
-    st.markdown('''
-    <div class="header-container">
-        <div class="tools-title">TOOLS</div>
-    </div>
-    <div class="tabs-container">
-        <span class="tab-active">TLS-001 RECURSOS E TIMELINE DO PROJETO</span>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown(
+        '''<div class="header-container"><div class="tools-title">TOOLS</div></div><div class="tabs-container"><span class="tab-active">TLS-001 RECURSOS E TIMELINE DO PROJETO</span></div>''',
+        unsafe_allow_html=True
+    )
 
 # ====== CRIAÇÃO DOS FILTROS MULTISELECT ======
 def create_multiselect_filter(label, options_base, key):
@@ -604,21 +592,12 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             buffer = io.BytesIO()
             df_matriz.to_excel(buffer, index=False, engine='openpyxl')
             dados_bytes = buffer.getvalue()
-            def salvar_eap_na_area_de_trabalho():
-                try:
-                    user_home = os.path.expanduser('~')
-                    onedrive_desktop = os.path.join(user_home, 'OneDrive', 'Desktop')
-                    desktop = onedrive_desktop if os.path.exists(onedrive_desktop) else os.path.join(user_home, 'Desktop')
-                    if not os.path.exists(desktop):
-                        os.makedirs(desktop, exist_ok=True)
-                    caminho_arquivo = os.path.join(desktop, "matriz_eap.xlsx")
-                    with open(caminho_arquivo, "wb") as f:
-                        f.write(dados_bytes)
-                    st.success(f"Arquivo salvo na área de trabalho: {caminho_arquivo}")
-                except Exception as e:
-                    st.error(f"Erro ao salvar na área de trabalho: {e}")
-            if st.button("Salvar na área de trabalho (Excel)", key="salvar-area-trabalho-eap-excel"):
-                salvar_eap_na_area_de_trabalho()
+            st.download_button(
+                label="Baixar Excel",
+                data=dados_bytes,
+                file_name="relatorio_obras.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
             def copiar_coluna_media():
                 try:
                     if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
