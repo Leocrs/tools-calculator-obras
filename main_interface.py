@@ -185,21 +185,22 @@ def apply_filters(df_eaps, filters, siglas_eaps):
             
     return filtered_df, filtro_aplicado
 
-def process_eap_matrix(eaps_dados, projetos_dados, selected_obras, monday_df, incc_df_eap, area_simulada_val=None):
+@st.cache_data(ttl=180, show_spinner=True)
+def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df, _incc_df_eap, area_simulada_val=None):
     """Processa a matriz EAP com cálculos INCC"""
     siglas_obras_eap = set()
     data_ref_dict = {}
     area_m2_dict_monday = {}
     
-    for doc in eaps_dados:
+    for doc in _eaps_dados:
         projeto_id = doc.get("projeto_id")
-        projeto_info = get_projeto_info_by_id(projeto_id, projetos_dados)
+        projeto_info = get_projeto_info_by_id(projeto_id, _projetos_dados)
         sigla_obra = projeto_info["sigla"] or projeto_info["nome"]
         siglas_obras_eap.add(sigla_obra)
         data_ref_dict[sigla_obra] = doc.get("dataBase", "")
     
-    if monday_df is not None and not monday_df.empty:
-        for idx, row in monday_df.iterrows():
+    if _monday_df is not None and not _monday_df.empty:
+        for idx, row in _monday_df.iterrows():
             nome_obra = str(row['Obras']).strip()
             area_obra = str(row['Area']).strip() if 'Area' in row else ''
             if nome_obra:
@@ -231,9 +232,9 @@ def process_eap_matrix(eaps_dados, projetos_dados, selected_obras, monday_df, in
     descricoes = {}
     grupo_dict = {}
     
-    for doc in eaps_dados:
+    for doc in _eaps_dados:
         projeto_id = doc.get("projeto_id")
-        projeto_info = get_projeto_info_by_id(projeto_id, projetos_dados)
+        projeto_info = get_projeto_info_by_id(projeto_id, _projetos_dados)
         sigla_obra = projeto_info["sigla"] or projeto_info["nome"]
         
         itens = doc.get("itens", [])
@@ -266,7 +267,7 @@ def process_eap_matrix(eaps_dados, projetos_dados, selected_obras, monday_df, in
                 valor = grupo_dict.get((codigo, descricoes.get(codigo, "")), {}).get(sigla, "")
                 valor_final = valor
                 
-                if incc_df_eap is not None and valor and str(valor).strip() not in ['', 'nan', 'none']:
+                if _incc_df_eap is not None and valor and str(valor).strip() not in ['', 'nan', 'none']:
                     try:
                         val_str = re.sub(r"[^0-9.,]", "", str(valor))
                         if val_str:
@@ -291,7 +292,7 @@ def process_eap_matrix(eaps_dados, projetos_dados, selected_obras, monday_df, in
                             except:
                                 area_real = 1.0
                             
-                            valor_unitario_real = calcular_valor_m2(custo_raw, area_real, data_base_obra, incc_df_eap)
+                            valor_unitario_real = calcular_valor_m2(custo_raw, area_real, data_base_obra, _incc_df_eap)
                             
                             if area_simulada_val and area_simulada_val > 0:
                                 valor_final = valor_unitario_real * area_simulada_val 

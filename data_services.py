@@ -122,6 +122,7 @@ def _convert_area(area_str):
     except:
         return 0.0
 
+@st.cache_data(ttl=600, show_spinner=False)
 def get_eap_data():
     """Busca dados de EAP e projetos do MongoDB"""
     eaps_collection = get_eaps_collection()
@@ -146,6 +147,7 @@ def get_eap_data():
         
     return eaps_dados, projetos_dados
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_incc_data():
     """Carrega dados do INCC do arquivo CSV"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -187,6 +189,7 @@ def get_projeto_info_by_id(projeto_id, projetos_dados):
         
     return projeto_info
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_siglas_eaps():
     """Obtém todas as siglas de EAPs do banco"""
     eaps_collection = get_eaps_collection()
