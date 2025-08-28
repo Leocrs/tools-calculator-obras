@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 from typing import Tuple, Optional
 from pymongo import MongoClient
 from bson import ObjectId
+import pyperclip
 
 # ====== CONFIGURAÇÃO DE CONEXÃO COM O BANCO DE DADOS ======
 MONGO_URI = "mongodb+srv://leonardocampos:leonardocampos@cluster0.7kdvlok.mongodb.net/ToolsConnect?retryWrites=true&w=majority"
@@ -200,8 +201,6 @@ def setup_page():
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
         .stApp {{ background-color: #ffffff !important; color: #262730 !important; }}
-        .main {{ padding-top: 0rem; background-color: #ffffff !important; font-family: "Source Sans 3", sans-serif; }}
-        .block-container {{ background-color: #ffffff !important; padding-top: 0rem; max-width: 100%; }}
         .header-container {{ background: white; padding: 1.5rem 2rem; border-bottom: 1px solid #e5e7eb; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }}
         .tools-title {{ color: #0e938e; font-size: 3rem; font-weight: 700; letter-spacing: -2px; margin: 0; font-family: "Source Sans 3", sans-serif; }}
         .tabs-container {{ border-bottom: 2px solid #0e938e; margin-bottom: 2rem; padding-left: 2rem; }}
@@ -211,26 +210,16 @@ def setup_page():
         .stTextInput > div > div > input {{ border: 1px solid #d1d5db !important; border-radius: 6px !important; background: white !important; font-size: 0.875rem !important; padding: 0.5rem 0.75rem !important; font-family: "Source Sans 3", sans-serif !important; color: #374151 !important; }}
         .stMultiSelect > div > div {{ border: 1px solid #d1d5db !important; border-radius: 6px !important; font-family: "Source Sans 3", sans-serif !important; background: #f9fafb !important; }}
         .stSlider > div > div > div > div {{ background-color: #0e938e !important; }}
-        .metrics-container {{ display: flex; gap: 2rem; margin: 1.5rem 2rem; align-items: flex-start; }}
-        .metric-simple {{ background: #ffffff; border: 2px solid #d1d5db; border-radius: 8px; padding: 1.5rem; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-width: 180px; flex: 1; }}
-        .metric-label {{ color: #6b7280; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 0.75rem; font-family: "Source Sans 3", sans-serif; }}
-        .metric-value {{ color: #1f2937; font-size: 2rem; font-weight: 700; margin: 0; font-family: "Source Sans 3", sans-serif; line-height: 1; }}
-        .table-container {{ margin: 0 2rem; }}
-        button[kind="secondary"] {{ background-color: white !important; border: 1px solid #0e938e !important; color: #0e938e !important; border-radius: 6px !important; }}
         #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}} header {{visibility: hidden;}} .stDeployButton {{visibility: hidden;}}
     </style>
     """, unsafe_allow_html=True)
 
 # ====== RENDERIZAÇÃO DO CABEÇALHO DA PÁGINA ======
 def render_header():
-    st.markdown('''
-    <div class="header-container">
-        <div class="tools-title">TOOLS</div>
-    </div>
-    <div class="tabs-container">
-        <span class="tab-active">TLS-001 RECURSOS E TIMELINE DO PROJETO</span>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown(
+        '''<div class="header-container"><div class="tools-title">TOOLS</div></div><div class="tabs-container"><span class="tab-active">TLS-001 RECURSOS E TIMELINE DO PROJETO</span></div>''',
+        unsafe_allow_html=True
+    )
 
 # ====== CRIAÇÃO DOS FILTROS MULTISELECT ======
 def create_multiselect_filter(label, options_base, key):
@@ -404,7 +393,10 @@ def get_eap_data():
         projeto_tratado = {k: clean_mongo_field(v) for k, v in p.items()}
         sigla = projeto_tratado.get("sigla", "")
         nome = projeto_tratado.get("nome", "Projeto sem nome")
-        projetos_dados[str(p["_id"])] = {"sigla": sigla, "nome": nome}
+        # Criar chave tanto como string quanto como ObjectId para compatibilidade
+        projeto_info = {"sigla": sigla, "nome": nome}
+        projetos_dados[str(p["_id"])] = projeto_info
+        projetos_dados[p["_id"]] = projeto_info  # ObjectId também como chave
     return eaps_dados, projetos_dados
 
 # ====== PROCESSAMENTO DA MATRIZ EAP ======
@@ -413,7 +405,25 @@ def process_eap_matrix(eaps_dados, projetos_dados, selected_obras, monday_df, in
     data_ref_dict = {}
     area_m2_dict_monday = {}
     for doc in eaps_dados:
-        projeto_info = projetos_dados.get(doc.get("projeto_id"), {"sigla": "", "nome": "Obra não encontrada"})
+        projeto_id = doc.get("projeto_id")
+        # Tenta buscar primeiro como vem, depois como string e por último como ObjectId
+        projeto_info = projetos_dados.get(projeto_id)
+        if not projeto_info:
+            projeto_info = projetos_dados.get(str(projeto_id)) if projeto_id else None
+        if not projeto_info and projeto_id:
+            try:
+                # Se projeto_id é string, tenta converter para ObjectId
+                if isinstance(projeto_id, str):
+                    projeto_info = projetos_dados.get(ObjectId(projeto_id))
+                # Se projeto_id é ObjectId, tenta como string
+                elif isinstance(projeto_id, ObjectId):
+                    projeto_info = projetos_dados.get(str(projeto_id))
+            except:
+                pass
+        
+        if not projeto_info:
+            projeto_info = {"sigla": "", "nome": "Obra não encontrada"}
+            
         sigla_obra = projeto_info["sigla"] or projeto_info["nome"]
         siglas_obras_eap.add(sigla_obra)
         data_ref_dict[sigla_obra] = doc.get("dataBase", "")
@@ -446,7 +456,25 @@ def process_eap_matrix(eaps_dados, projetos_dados, selected_obras, monday_df, in
     descricoes = {}
     grupo_dict = {}
     for doc in eaps_dados:
-        projeto_info = projetos_dados.get(doc.get("projeto_id"), {"sigla": "", "nome": "Obra não encontrada"})
+        projeto_id = doc.get("projeto_id")
+        # Tenta buscar primeiro como vem, depois como string e por último como ObjectId
+        projeto_info = projetos_dados.get(projeto_id)
+        if not projeto_info:
+            projeto_info = projetos_dados.get(str(projeto_id)) if projeto_id else None
+        if not projeto_info and projeto_id:
+            try:
+                # Se projeto_id é string, tenta converter para ObjectId
+                if isinstance(projeto_id, str):
+                    projeto_info = projetos_dados.get(ObjectId(projeto_id))
+                # Se projeto_id é ObjectId, tenta como string
+                elif isinstance(projeto_id, ObjectId):
+                    projeto_info = projetos_dados.get(str(projeto_id))
+            except:
+                pass
+        
+        if not projeto_info:
+            projeto_info = {"sigla": "", "nome": "Obra não encontrada"}
+            
         sigla_obra = projeto_info["sigla"] or projeto_info["nome"]
         itens = doc.get("itens", [])
         itens_nivel_1 = [item for item in itens if item.get("nivel") == 1]
@@ -603,21 +631,12 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             buffer = io.BytesIO()
             df_matriz.to_excel(buffer, index=False, engine='openpyxl')
             dados_bytes = buffer.getvalue()
-            def salvar_eap_na_area_de_trabalho():
-                try:
-                    user_home = os.path.expanduser('~')
-                    onedrive_desktop = os.path.join(user_home, 'OneDrive', 'Desktop')
-                    desktop = onedrive_desktop if os.path.exists(onedrive_desktop) else os.path.join(user_home, 'Desktop')
-                    if not os.path.exists(desktop):
-                        os.makedirs(desktop, exist_ok=True)
-                    caminho_arquivo = os.path.join(desktop, "matriz_eap.xlsx")
-                    with open(caminho_arquivo, "wb") as f:
-                        f.write(dados_bytes)
-                    st.success(f"Arquivo salvo na área de trabalho: {caminho_arquivo}")
-                except Exception as e:
-                    st.error(f"Erro ao salvar na área de trabalho: {e}")
-            if st.button("Salvar na área de trabalho (Excel)", key="salvar-area-trabalho-eap-excel"):
-                salvar_eap_na_area_de_trabalho()
+            st.download_button(
+                label="Baixar Excel",
+                data=dados_bytes,
+                file_name="relatorio_obras.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
             def copiar_coluna_media():
                 try:
                     if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
@@ -672,11 +691,29 @@ def main():
         for eap in eaps_collection.find({}):
             projeto_id = eap.get("projeto_id", None)
             if projeto_id:
+                projeto = None
+                # Primeiro tenta buscar como ObjectId
                 try:
-                    projeto_obj_id = ObjectId(projeto_id)
-                    projeto = projetos_collection.find_one({"_id": projeto_obj_id})
+                    if isinstance(projeto_id, str):
+                        projeto_obj_id = ObjectId(projeto_id)
+                        projeto = projetos_collection.find_one({"_id": projeto_obj_id})
+                    elif isinstance(projeto_id, ObjectId):
+                        projeto = projetos_collection.find_one({"_id": projeto_id})
                 except:
-                    projeto = None
+                    pass
+                
+                # Se não encontrou, tenta outras abordagens
+                if not projeto and projeto_id:
+                    try:
+                        # Tenta buscar diretamente como vem
+                        projeto = projetos_collection.find_one({"_id": projeto_id})
+                    except:
+                        # Último recurso: tenta como string
+                        try:
+                            projeto = projetos_collection.find_one({"_id": str(projeto_id)})
+                        except:
+                            pass
+                            
                 if projeto:
                     sigla = projeto.get("sigla", "")
                     if sigla and str(sigla).strip():
