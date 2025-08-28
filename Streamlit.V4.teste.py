@@ -393,7 +393,10 @@ def get_eap_data():
         projeto_tratado = {k: clean_mongo_field(v) for k, v in p.items()}
         sigla = projeto_tratado.get("sigla", "")
         nome = projeto_tratado.get("nome", "Projeto sem nome")
-        projetos_dados[str(p["_id"])] = {"sigla": sigla, "nome": nome}
+        # Criar chave tanto como string quanto como ObjectId para compatibilidade
+        projeto_info = {"sigla": sigla, "nome": nome}
+        projetos_dados[str(p["_id"])] = projeto_info
+        projetos_dados[p["_id"]] = projeto_info  # ObjectId também como chave
     return eaps_dados, projetos_dados
 
 # ====== PROCESSAMENTO DA MATRIZ EAP ======
@@ -402,7 +405,25 @@ def process_eap_matrix(eaps_dados, projetos_dados, selected_obras, monday_df, in
     data_ref_dict = {}
     area_m2_dict_monday = {}
     for doc in eaps_dados:
-        projeto_info = projetos_dados.get(doc.get("projeto_id"), {"sigla": "", "nome": "Obra não encontrada"})
+        projeto_id = doc.get("projeto_id")
+        # Tenta buscar primeiro como vem, depois como string e por último como ObjectId
+        projeto_info = projetos_dados.get(projeto_id)
+        if not projeto_info:
+            projeto_info = projetos_dados.get(str(projeto_id)) if projeto_id else None
+        if not projeto_info and projeto_id:
+            try:
+                # Se projeto_id é string, tenta converter para ObjectId
+                if isinstance(projeto_id, str):
+                    projeto_info = projetos_dados.get(ObjectId(projeto_id))
+                # Se projeto_id é ObjectId, tenta como string
+                elif isinstance(projeto_id, ObjectId):
+                    projeto_info = projetos_dados.get(str(projeto_id))
+            except:
+                pass
+        
+        if not projeto_info:
+            projeto_info = {"sigla": "", "nome": "Obra não encontrada"}
+            
         sigla_obra = projeto_info["sigla"] or projeto_info["nome"]
         siglas_obras_eap.add(sigla_obra)
         data_ref_dict[sigla_obra] = doc.get("dataBase", "")
@@ -435,7 +456,25 @@ def process_eap_matrix(eaps_dados, projetos_dados, selected_obras, monday_df, in
     descricoes = {}
     grupo_dict = {}
     for doc in eaps_dados:
-        projeto_info = projetos_dados.get(doc.get("projeto_id"), {"sigla": "", "nome": "Obra não encontrada"})
+        projeto_id = doc.get("projeto_id")
+        # Tenta buscar primeiro como vem, depois como string e por último como ObjectId
+        projeto_info = projetos_dados.get(projeto_id)
+        if not projeto_info:
+            projeto_info = projetos_dados.get(str(projeto_id)) if projeto_id else None
+        if not projeto_info and projeto_id:
+            try:
+                # Se projeto_id é string, tenta converter para ObjectId
+                if isinstance(projeto_id, str):
+                    projeto_info = projetos_dados.get(ObjectId(projeto_id))
+                # Se projeto_id é ObjectId, tenta como string
+                elif isinstance(projeto_id, ObjectId):
+                    projeto_info = projetos_dados.get(str(projeto_id))
+            except:
+                pass
+        
+        if not projeto_info:
+            projeto_info = {"sigla": "", "nome": "Obra não encontrada"}
+            
         sigla_obra = projeto_info["sigla"] or projeto_info["nome"]
         itens = doc.get("itens", [])
         itens_nivel_1 = [item for item in itens if item.get("nivel") == 1]
@@ -652,11 +691,29 @@ def main():
         for eap in eaps_collection.find({}):
             projeto_id = eap.get("projeto_id", None)
             if projeto_id:
+                projeto = None
+                # Primeiro tenta buscar como ObjectId
                 try:
-                    projeto_obj_id = ObjectId(projeto_id)
-                    projeto = projetos_collection.find_one({"_id": projeto_obj_id})
+                    if isinstance(projeto_id, str):
+                        projeto_obj_id = ObjectId(projeto_id)
+                        projeto = projetos_collection.find_one({"_id": projeto_obj_id})
+                    elif isinstance(projeto_id, ObjectId):
+                        projeto = projetos_collection.find_one({"_id": projeto_id})
                 except:
-                    projeto = None
+                    pass
+                
+                # Se não encontrou, tenta outras abordagens
+                if not projeto and projeto_id:
+                    try:
+                        # Tenta buscar diretamente como vem
+                        projeto = projetos_collection.find_one({"_id": projeto_id})
+                    except:
+                        # Último recurso: tenta como string
+                        try:
+                            projeto = projetos_collection.find_one({"_id": str(projeto_id)})
+                        except:
+                            pass
+                            
                 if projeto:
                     sigla = projeto.get("sigla", "")
                     if sigla and str(sigla).strip():
