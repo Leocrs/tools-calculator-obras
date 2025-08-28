@@ -1,13 +1,13 @@
 # TOOLS Calculator
 
-Sistema profissional para análise de obras com cálculos de INCC (Índice Nacional da Construção Civil).
+Sistema para análise de obras com cálculos de INCC (Índice Nacional da Construção Civil).
 
 ## Estrutura do Projeto
 
 ```
 tools-calculator-obras/
 ├── config_utils.py          # Configurações e utilitários
-├── data_services.py         # Serviços de dados (MongoDB, Monday.com)  
+├── data_services.py         # Serviços de dados (MongoDB, Monday.com)
 ├── main_interface.py        # Interface principal da aplicação
 ├── incc_collector.py        # Coleta de dados do INCC
 ├── dados_dia01_indice.csv   # Base de dados histórica do INCC
@@ -18,18 +18,21 @@ tools-calculator-obras/
 ## Módulos
 
 ### 1. config_utils.py
+
 - Configurações do sistema (MongoDB, Monday.com)
 - Funções utilitárias para formatação de dados
 - Cálculos de valores ajustados pelo INCC
 - Configuração da interface Streamlit
 
-### 2. data_services.py  
+### 2. data_services.py
+
 - Integração com Monday.com
 - Operações com MongoDB
 - Processamento de dados de EAP
 - Carregamento de dados do INCC
 
 ### 3. main_interface.py
+
 - Interface principal do usuário
 - Sistema de filtros
 - Renderização de tabelas
@@ -38,11 +41,13 @@ tools-calculator-obras/
 ## Como Executar
 
 1. Instale as dependências:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 2. Execute a aplicação:
+
 ```bash
 streamlit run main_interface.py
 ```
