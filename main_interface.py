@@ -152,13 +152,12 @@ def apply_filters(df_eaps, filters, siglas_eaps):
         return filtered_df.iloc[0:0], True
     
     if filters['modo'] == "Todos os critérios (E/Interseção)":
+        # Aplicar filtro de obras com OR dentro do grupo (múltiplas obras permitidas)
         if filters['obras'] and len(filters['obras']) > 0 and 'Obras' in df_eaps.columns:
-            if len(filters['obras']) == 1:
-                filtered_df = filtered_df[filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") == filters['obras'][0])]
-            else:
-                filtered_df = filtered_df.iloc[0:0]
+            filtered_df = filtered_df[filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
             filtro_aplicado = True
             
+        # Aplicar filtros de construtora e arquitetura com OR dentro de cada grupo
         for filter_key, column in [('construtora', 'Construtora'), ('arquitetura', 'Arquitetura')]:
             if filters[filter_key] and len(filters[filter_key]) > 0 and column in df_eaps.columns:
                 selected = [str(x).strip().lower() for x in filters[filter_key]]
@@ -167,18 +166,22 @@ def apply_filters(df_eaps, filters, siglas_eaps):
                 ]
                 filtro_aplicado = True
     else:
+        # Modo "Qualquer critério (OU/União)" - une os índices de todos os filtros aplicados
         indices = set()
+        
+        # Filtro de obras
         if filters['obras'] and len(filters['obras']) > 0 and 'Obras' in df_eaps.columns:
             indices_obras = set(filtered_df[filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])].index)
             indices.update(indices_obras)
             
+        # Filtros de construtora e arquitetura
         for filter_key, column in [('construtora', 'Construtora'), ('arquitetura', 'Arquitetura')]:
             if filters[filter_key] and len(filters[filter_key]) > 0 and column in df_eaps.columns:
-                mask = filtered_df[column].astype(str).str.upper().str.contains(
-                    '|'.join([term.upper() for term in filters[filter_key]]), na=False
-                )
+                selected = [str(x).strip().lower() for x in filters[filter_key]]
+                mask = filtered_df[column].astype(str).str.strip().str.lower().isin(selected)
                 indices.update(set(filtered_df[mask].index))
                 
+        # Aplicar união de todos os índices encontrados
         if indices:
             filtered_df = filtered_df.loc[list(indices)]
             filtro_aplicado = True
