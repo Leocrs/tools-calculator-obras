@@ -384,38 +384,41 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             
             df_matriz_exibir = df_matriz.copy()
             selecao_linhas = st.session_state['selecao_linhas']
-            
             idx_checkbox = [i for i in range(len(df_matriz_exibir)) if not (
                 (i == 0 and str(df_matriz_exibir.iloc[i,1]).strip().upper() == "ÁREA M²") or
                 (i == 1 and str(df_matriz_exibir.iloc[i,1]).strip().upper() == "DATA BASE")
             )]
-            
             selecao_col = [None]*len(df_matriz_exibir)
             for idx in idx_checkbox:
                 selecao_col[idx] = selecao_linhas[idx]
-                
             df_matriz_exibir.insert(0, "Selecionar", selecao_col)
-            
+            # Filtra para exibir apenas as linhas selecionadas (exceto cabeçalhos)
+            linhas_exibir = [i for i in range(len(df_matriz_exibir)) if (i < 2 or selecao_col[i])]
+            df_matriz_exibir = df_matriz_exibir.iloc[linhas_exibir].reset_index(drop=True)
             df_matriz_editada = st.data_editor(
                 df_matriz_exibir,
                 use_container_width=True,
                 column_config=column_config,
                 disabled=[col for col in df_matriz_exibir.columns if col != "Selecionar"]
             )
-            
             if "Selecionar" in df_matriz_editada.columns:
                 nova_selecao = st.session_state['selecao_linhas'][:]
+                mudou = False
                 for idx in idx_checkbox:
-                    nova_selecao[idx] = bool(df_matriz_editada.loc[idx, "Selecionar"])
+                    if idx < len(df_matriz_editada):
+                        novo_valor = bool(df_matriz_editada.loc[idx, "Selecionar"])
+                        if nova_selecao[idx] != novo_valor:
+                            nova_selecao[idx] = novo_valor
+                            mudou = True
                 if len(nova_selecao) > 1:
                     nova_selecao[0] = True
                     nova_selecao[1] = True
                 st.session_state['selecao_linhas'] = nova_selecao
-            
+                if mudou:
+                    st.rerun()
             buffer = io.BytesIO()
             df_matriz.to_excel(buffer, index=False, engine='openpyxl')
             dados_bytes = buffer.getvalue()
-            
             st.download_button(
                 label="Baixar Excel",
                 data=dados_bytes,
