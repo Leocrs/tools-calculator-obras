@@ -188,7 +188,7 @@ def apply_filters(df_eaps, filters, siglas_eaps):
             
     return filtered_df, filtro_aplicado
 
-@st.cache_data(ttl=180, show_spinner=True)
+@st.cache_data(ttl=86400, show_spinner=True)
 def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df, _incc_df_eap, area_simulada_val=None):
     """Processa a matriz EAP com cálculos INCC"""
     siglas_obras_eap = set()
@@ -427,6 +427,13 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             )
             
             def copiar_coluna_media():
+                """Gera e copia a coluna 'Média' em um único clique.
+
+                Estratégia:
+                1) Tenta usar pyperclip no servidor (útil para execução local).
+                2) Se falhar, injeta JS no cliente via components.html para copiar usando
+                   navigator.clipboard.writeText() com fallback para document.execCommand('copy').
+                """
                 try:
                     if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
                         valores_media = []
@@ -437,23 +444,59 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                                 val = row["Média"]
                                 if val and str(val).strip():
                                     valores_media.append(str(val).strip())
-                        
-                        if valores_media:
-                            texto_copia = "\n".join(valores_media)
-                            try:
-                                import pyperclip
-                                pyperclip.copy(texto_copia)
-                                st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            except:
-                                import streamlit.components.v1 as components
-                                components.html(f"""
-                                <button onclick="navigator.clipboard.writeText(`{texto_copia}`).then(()=>document.getElementById('msg').innerHTML='✅ Copiado! Cole com Ctrl+V')" 
-                                style="background:#00cc88;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-weight:bold">
-                                Copiar {len(valores_media)} valores</button>
-                                <div id="msg" style="margin-top:10px;font-weight:bold"></div>
-                                """, height=80)
-                        else:
+
+                        if not valores_media:
                             st.warning("Nenhum valor marcado para copiar na coluna Média.")
+                            return
+
+                        texto_copia = "\n".join(valores_media)
+
+                        # 1) Tenta copiar no servidor (pyperclip) - útil em localhost
+                        try:
+                            import pyperclip
+                            pyperclip.copy(texto_copia)
+                            st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
+                            return
+                        except Exception:
+                            # Ignorar e usar fallback para copiar no cliente
+                            pass
+
+                        # 2) Fallback: copiar no navegador usando JS embutido
+                        import streamlit.components.v1 as components
+
+                        # Escapar texto para inserir em template JS/HTML
+                        safe_text = texto_copia.replace('\\', '\\\\').replace('`', '\`').replace('</', '<\/').replace('\n', '\\n').replace('\r', '')
+
+                        js = f"""
+                        <script>
+                        (async function() {{
+                            const text = `{safe_text}`;
+                            try {{
+                                if (navigator.clipboard && navigator.clipboard.writeText) {{
+                                    await navigator.clipboard.writeText(text);
+                                    // mostra um pequeno status no iframe
+                                    document.body.innerHTML = '<div style="font-weight:bold;color:green">✅ Copiado para a área de transferência do navegador. Cole com Ctrl+V.</div>';
+                                }} else {{
+                                    const ta = document.createElement('textarea');
+                                    ta.value = text;
+                                    ta.style.position = 'fixed';
+                                    ta.style.left = '-9999px';
+                                    document.body.appendChild(ta);
+                                    ta.select();
+                                    document.execCommand('copy');
+                                    ta.remove();
+                                    document.body.innerHTML = '<div style="font-weight:bold;color:green">✅ Copiado para a área de transferência do navegador. Cole com Ctrl+V.</div>';
+                                }}
+                            }} catch (e) {{
+                                document.body.innerHTML = '<div style="font-weight:bold;color:crimson">Falha ao copiar automaticamente. Selecionar e copiar manualmente:</div><pre style="white-space:pre-wrap">' + text + '</pre>';
+                            }}
+                        }})();
+                        </script>
+                        """
+
+                        components.html(js, height=120)
+                        # Informar o usuário: a ação de cópia foi solicitada ao navegador
+                        st.info(f"A cópia foi solicitada ao navegador — cole com Ctrl+V. ({len(valores_media)} valores).")
                     else:
                         st.error("Coluna Média ou coluna Selecionar não encontrada.")
                 except Exception as e:

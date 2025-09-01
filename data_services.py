@@ -10,8 +10,13 @@ import re
 from typing import Tuple, Optional
 from bson import ObjectId
 from config_utils import APIConfig, get_eaps_collection, get_projetos_collection, clean_and_format
+import tempfile
+import time
+import datetime
+import csv
+import traceback
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def get_monday_data() -> Tuple[Optional[str], Optional[pd.DataFrame]]:
     """Busca dados do Monday.com e retorna DataFrame processado"""
     query = f'''
@@ -122,7 +127,7 @@ def _convert_area(area_str):
     except:
         return 0.0
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=86400, show_spinner=False)
 def get_eap_data():
     """Busca dados de EAP e projetos do MongoDB"""
     eaps_collection = get_eaps_collection()
@@ -147,25 +152,164 @@ def get_eap_data():
         
     return eaps_dados, projetos_dados
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=86400, show_spinner=False)
 def load_incc_data():
     """Carrega dados do INCC do arquivo CSV"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     incc_path = os.path.join(script_dir, 'dados_dia01_indice.csv')
-    
+
+    def _collect_incc_csv(final_path):
+        """Coleta dados do site e escreve CSV no mesmo formato, usando arquivo temporário e replace atômico."""
+        url = "https://indiceseconomicos.secovi.com.br/indicadormensal.php?idindicador=59"
+        meses = {
+            'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 
+            'MAI': '05', 'JUN': '06', 'JUL': '07', 'AGO': '08', 
+            'SET': '09', 'OUT': '10', 'NOV': '11', 'DEZ': '12'
+        }
+
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+        except Exception:
+            raise
+
+        try:
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, 'html.parser')
+
+            dados = []
+            tables = soup.find_all('table')
+            ano_atual = None
+            for table in tables:
+                # tenta extrair ano
+                txt = table.get_text(separator=' ')
+                m = re.search(r'Ano:\s*(\d{4})', txt)
+                if m:
+                    ano_atual = m.group(1)
+                    continue
+
+                linhas = table.find_all('tr')
+                for linha in linhas:
+                    cols = linha.find_all('td')
+                    if len(cols) >= 2 and ano_atual:
+                        mes = cols[0].get_text(strip=True).upper()
+                        indice = cols[1].get_text(strip=True).replace('.', '').replace(',', '.')
+                        if mes in meses:
+                            data = f"01/{meses[mes]}/{ano_atual}"
+                            try:
+                                valor = float(indice)
+                                dados.append([data, valor])
+                            except:
+                                continue
+
+            if not dados:
+                raise RuntimeError('Nenhum dado coletado do site INCC')
+
+            # escrever em arquivo temporário e mover atômico
+            tmp_fd, tmp_path = tempfile.mkstemp(prefix='incc_', suffix='.csv', dir=script_dir)
+            os.close(tmp_fd)
+            try:
+                with open(tmp_path, 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(['data', 'indice'])
+                    writer.writerows(dados)
+                os.replace(tmp_path, final_path)
+            finally:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except:
+                        pass
+
+        except Exception as e:
+            # propaga exceção para o chamador tratar (fallback)
+            raise
+
+    def _is_csv_outdated(path):
+        try:
+            df_check = pd.read_csv(path, usecols=['data'], parse_dates=['data'], dayfirst=True, encoding='utf-8-sig')
+            if df_check.empty:
+                return True
+            max_date = df_check['data'].max()
+            if pd.isna(max_date):
+                return True
+            today = datetime.date.today()
+            first_of_month = datetime.date(today.year, today.month, 1)
+            return max_date.date() < first_of_month
+        except Exception:
+            return True
+
+    # Lock handling to avoid múltiplos processos baixando simultaneamente
+    lock_path = incc_path + '.lock'
+    try:
+        # se arquivo não existe ou está desatualizado, coletar
+        need_collect = False
+        if not os.path.exists(incc_path):
+            need_collect = True
+        else:
+            if _is_csv_outdated(incc_path):
+                need_collect = True
+
+        if need_collect:
+            # tentar criar lock atômico
+            got_lock = False
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                got_lock = True
+            except FileExistsError:
+                got_lock = False
+
+            if got_lock:
+                try:
+                    _collect_incc_csv(incc_path)
+                except Exception:
+                    # falha na coleta: se existir CSV antigo, seguimos com ele; caso contrário, repropaga
+                    if not os.path.exists(incc_path):
+                        raise
+                finally:
+                    try:
+                        os.remove(lock_path)
+                    except:
+                        pass
+            else:
+                # outro processo está coletando: aguardar até 10s pelo arquivo ou timeout
+                waited = 0.0
+                while waited < 10.0:
+                    if os.path.exists(incc_path):
+                        break
+                    time.sleep(0.25)
+                    waited += 0.25
+
+        # se chegamos aqui e arquivo existe, carregar via função cacheada por mtime
+        if os.path.exists(incc_path):
+            mtime = os.path.getmtime(incc_path)
+            return _load_incc_data_cached(mtime, incc_path)
+
+        return None
+    except Exception:
+        # em caso de erro final, não quebrar app
+        return None
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _load_incc_data_cached(mtime, path):
+    """Leitura cacheada do CSV; a chave do cache inclui o mtime para invalidar quando o arquivo mudar."""
     try:
         incc_df = pd.read_csv(
-            incc_path, 
-            sep=',', 
-            decimal='.', 
-            encoding='utf-8', 
-            parse_dates=['data'], 
+            path,
+            sep=',',
+            decimal='.',
+            encoding='utf-8-sig',
+            parse_dates=['data'],
             dayfirst=True
         )
         incc_df = incc_df.sort_values('data')
         incc_df = incc_df[pd.to_numeric(incc_df['indice'], errors='coerce').notnull()]
         return incc_df
-    except:
+    except Exception:
         return None
 
 def get_projeto_info_by_id(projeto_id, projetos_dados):
@@ -189,7 +333,7 @@ def get_projeto_info_by_id(projeto_id, projetos_dados):
         
     return projeto_info
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=86400, show_spinner=False)
 def get_siglas_eaps():
     """Obtém todas as siglas de EAPs do banco"""
     eaps_collection = get_eaps_collection()
