@@ -471,13 +471,18 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                         if val and str(val).strip():
                             valores_media.append(str(val).strip())
             texto_copia = "\n".join(valores_media) if valores_media else ""
-            copy_button(
-                texto_copia,
-                icon='material_symbols',
-                tooltip='Copiar valores da coluna Média',
-                copied_label='Valores copiados!',
-                key='copiar-coluna-media-eap',
-            )
+            # Alinhamento horizontal simples, botão e texto lado a lado
+            col1, col2 = st.columns([0.1, 1])
+            with col1:
+                st.write('Coluna Média')
+            with col2:
+                copy_button(
+                    texto_copia,
+                    icon='material_symbols',
+                    tooltip='Copiar valores da coluna Média',
+                    copied_label='Valores copiados!',
+                    key='copiar-coluna-media-eap',
+                )
                 
         else:
             st.info("Nenhum dado encontrado na coleção EAPS.")
