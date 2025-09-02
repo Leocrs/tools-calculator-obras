@@ -459,8 +459,25 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                 except Exception as e:
                     st.error(f"Erro ao preparar coluna Média: {e}")
             
-            if st.button("Copiar coluna Média", key="copiar-coluna-media-eap"):
-                copiar_coluna_media()
+            from st_copy import copy_button
+            # Prepara o texto para copiar
+            valores_media = []
+            if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
+                for idx, row in df_matriz_exibir.iterrows():
+                    if idx < 2:
+                        continue
+                    if row["Selecionar"]:
+                        val = row["Média"]
+                        if val and str(val).strip():
+                            valores_media.append(str(val).strip())
+            texto_copia = "\n".join(valores_media) if valores_media else ""
+            copy_button(
+                texto_copia,
+                icon='material_symbols',
+                tooltip='Copiar valores da coluna Média',
+                copied_label='Valores copiados!',
+                key='copiar-coluna-media-eap',
+            )
                 
         else:
             st.info("Nenhum dado encontrado na coleção EAPS.")
