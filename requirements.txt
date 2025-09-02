@@ -11,4 +11,4 @@ numpy
 pyperclip
 beautifulsoup4
 st-copy-button
-st-copy-clipboard
+st-copy
