@@ -26,12 +26,16 @@ jobs:
         run: |
           python incc_collector.py
 
-      - name: Commit e push das alterações
+      - name: Commit alterações se houver
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "GitHub Actions"
           git add .
-          git commit -m "Atualização automática do índice INCC"
-          git push
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Atualiza INCC"
+            git push
+          else
+            echo "Nenhuma alteração para commit"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
