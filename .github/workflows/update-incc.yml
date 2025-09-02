@@ -1,0 +1,37 @@
+name: Atualiza INCC mensalmente
+
+on:
+  schedule:
+    # Executa às 7h UTC do dia 2 de cada mês
+    - cron: '0 7 2 * *'
+  workflow_dispatch:
+
+jobs:
+  update-incc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instala dependências
+        run: |
+          pip install -r requirements.txt
+
+      - name: Executa o coletor INCC
+        run: |
+          python incc_collector.py
+
+      - name: Commit e push das alterações
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add .
+          git commit -m "Atualização automática do índice INCC"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
