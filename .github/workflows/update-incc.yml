@@ -1,0 +1,41 @@
+name: Atualiza INCC mensalmente
+
+on:
+  schedule:
+    # Executa às 7h UTC do dia 2 de cada mês
+    - cron: '0 7 2 * *'
+  workflow_dispatch:
+
+jobs:
+  update-incc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instala dependências
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: Executa o coletor INCC
+        run: |
+          python incc_collector.py
+
+      - name: Commit e push das alterações
+        run: |
+          git config --local user.email "github-actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add dados_dia01_indice.csv
+          if git diff --staged --quiet; then
+            echo "Nenhuma alteração para commit."
+          else
+            git commit -m "Atualização automática do índice INCC - $(date +'%Y-%m-%d')"
+            git push
+          fi
