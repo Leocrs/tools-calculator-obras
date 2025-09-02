@@ -10,4 +10,4 @@ python-dateutil
 numpy
 pyperclip
 beautifulsoup4
-
+st-copy-button
