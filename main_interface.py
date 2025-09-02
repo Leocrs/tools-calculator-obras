@@ -426,41 +426,32 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            def copiar_coluna_media():
-                try:
-                    if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
-                        valores_media = []
-                        for idx, row in df_matriz_exibir.iterrows():
-                            if idx < 2:
-                                continue
-                            if row["Selecionar"]:
-                                val = row["Média"]
-                                if val and str(val).strip():
-                                    valores_media.append(str(val).strip())
-                        
-                        if valores_media:
-                            texto_copia = "\n".join(valores_media)
-                            try:
-                                import pyperclip
-                                pyperclip.copy(texto_copia)
-                                st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            except:
-                                import streamlit.components.v1 as components
-                                components.html(f"""
-                                <button onclick="navigator.clipboard.writeText(`{texto_copia}`).then(()=>document.getElementById('msg').innerHTML='✅ Copiado! Cole com Ctrl+V')" 
-                                style="background:#00cc88;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-weight:bold">
-                                Copiar {len(valores_media)} valores</button>
-                                <div id="msg" style="margin-top:10px;font-weight:bold"></div>
-                                """, height=80)
-                        else:
-                            st.warning("Nenhum valor marcado para copiar na coluna Média.")
+            try:
+                from st_copy import copy_button
+                
+                if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
+                    valores_media = []
+                    for idx, row in df_matriz_exibir.iterrows():
+                        if idx < 2:
+                            continue
+                        if row["Selecionar"]:
+                            val = row["Média"]
+                            if val and str(val).strip():
+                                valores_media.append(str(val).strip())
+                    
+                    if valores_media:
+                        texto_copia = "\n".join(valores_media)
+                        copy_button(
+                            texto_copia,
+                            icon='material_symbols',
+                            tooltip='Copiar valores da coluna Média',
+                            copied_label=f'✅ {len(valores_media)} valores copiados!',
+                            key='copy_media_values'
+                        )
                     else:
-                        st.error("Coluna Média ou coluna Selecionar não encontrada.")
-                except Exception as e:
-                    st.error(f"Erro ao preparar coluna Média: {e}")
-            
-            if st.button("Copiar coluna Média", key="copiar-coluna-media-eap"):
-                copiar_coluna_media()
+                        st.warning("Nenhum valor marcado para copiar na coluna Média.")
+            except ImportError:
+                st.error("Biblioteca st-copy-button não instalada. Execute: pip install st-copy-button")
                 
         else:
             st.info("Nenhum dado encontrado na coleção EAPS.")
