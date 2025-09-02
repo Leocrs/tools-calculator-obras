@@ -60,17 +60,6 @@ A função `get_credentials()` em `config_utils.py`:
 2. **2ª Tentativa:** Variáveis de ambiente (arquivo .env)
 3. **Fallback:** Erro explicativo se nenhum método funcionar
 
----
-
-## ⚠️ **Importante**
-
-- **NUNCA** commite arquivos com credenciais
-- **SEMPRE** use variáveis de ambiente em produção
-- **TESTE** localmente antes do deploy
-- **MANTENHA** credenciais atualizadas
-
----
-
 ## 🛠️ **Outras Plataformas**
 
 ### **Heroku:**
