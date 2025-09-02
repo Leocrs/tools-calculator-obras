@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configura Python
         uses: actions/setup-python@v5
@@ -20,7 +22,7 @@ jobs:
 
       - name: Instala dependências
         run: |
-          pip install -r requirements.txt
+          pip install requests beautifulsoup4
 
       - name: Executa o coletor INCC
         run: |
@@ -28,13 +30,12 @@ jobs:
 
       - name: Commit e push das alterações
         run: |
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git add .
-          if ! git diff --cached --quiet; then
-            git commit -m "Atualização automática do índice INCC"
-            git push
-          else
+          git config --local user.email "github-actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add dados_dia01_indice.csv
+          if git diff --staged --quiet; then
             echo "Nenhuma alteração para commit."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          else
+            git commit -m "Atualização automática do índice INCC - $(date +'%Y-%m-%d')"
+            git push
+          fi
