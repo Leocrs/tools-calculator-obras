@@ -17,21 +17,16 @@ from data_services import (
 
 def create_multiselect_filter(label, options_base, key):
     """Cria filtro multiselect com comportamento customizado"""
-    options = options_base
     if key not in st.session_state:
         st.session_state[key] = []
         
     st.multiselect(
-        "",
-        options,
-        key=key,
+        "", options_base, key=key,
         label_visibility="collapsed",
         placeholder="Escolha uma opção"
     )
     
-    if key == "obras" and not st.session_state[key]:
-        return options_base
-    return st.session_state[key]
+    return options_base if key == "obras" and not st.session_state[key] else st.session_state[key]
 
 def render_filters(df_eaps, siglas_eaps):
     """Renderiza os filtros principais da interface"""
@@ -43,25 +38,10 @@ def render_filters(df_eaps, siglas_eaps):
     filtro_modo = st.radio(
         "Modo de combinação dos filtros:",
         ["Todos os critérios (E/Interseção)", "Qualquer critério (OU/União)"],
-        horizontal=True,
-        key="modo_filtro"
+        horizontal=True, key="modo_filtro"
     )
     
-    obras_filter = st.session_state.get("obras", [])
-    construtora_filter = st.session_state.get("construtora", [])
-    arquitetura_filter = st.session_state.get("arquitetura", [])
-    local_filter = st.session_state.get("local", "")
-    
-    df_filtrado = df_eaps.copy()
-    if obras_filter:
-        df_filtrado = df_filtrado[df_filtrado['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in obras_filter)]
-    if construtora_filter:
-        df_filtrado = df_filtrado[df_filtrado['Construtora'].astype(str).str.strip().str.lower().isin([str(x).strip().lower() for x in construtora_filter])]
-    if arquitetura_filter:
-        df_filtrado = df_filtrado[df_filtrado['Arquitetura'].astype(str).str.strip().str.lower().isin([str(x).strip().lower() for x in arquitetura_filter])]
-    if local_filter:
-        df_filtrado = df_filtrado[df_filtrado['Local'].astype(str).str.strip().str.lower() == str(local_filter).strip().lower()]
-    
+    # Preparação das opções
     obras_opcoes = sorted(df_eaps['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla")).unique().tolist())
     construtora_opcoes = sorted([x for x in df_eaps['Construtora'].dropna().astype(str).str.strip().unique().tolist() if x])
     arquitetura_opcoes = sorted(df_eaps['Arquitetura'].dropna().astype(str).str.strip().unique().tolist())
@@ -72,14 +52,14 @@ def render_filters(df_eaps, siglas_eaps):
     with col1:
         st.markdown('<div class="filter-label">ÁREA (m²)</div>', unsafe_allow_html=True)
         area_range = None
-        if 'Area_Numeric' in df_filtrado.columns:
-            valid_areas = df_filtrado['Area_Numeric'].dropna()
+        if 'Area_Numeric' in df_eaps.columns:
+            valid_areas = df_eaps['Area_Numeric'].dropna()
             if not valid_areas.empty:
-                min_area = 0
-                max_area = int(valid_areas.max()) if pd.notna(valid_areas.max()) else 0
+                min_area, max_area = 0, int(valid_areas.max())
                 area_range = st.slider(
-                    "", min_value=min_area, max_value=max_area, value=(min_area, max_area),
-                    step=100, key="area", label_visibility="collapsed", format="%d m²"
+                    "", min_value=min_area, max_value=max_area, 
+                    value=(min_area, max_area), step=100, 
+                    key="area", label_visibility="collapsed", format="%d m²"
                 )
                 
     with col2:
@@ -104,11 +84,8 @@ def render_filters(df_eaps, siglas_eaps):
     with col6:
         st.markdown('<div class="filter-label">Simular valores para área (m²):</div>', unsafe_allow_html=True)
         area_simulada = st.text_input(
-            "",
-            value="",
-            placeholder="Digite uma área para simulação (opcional)",
-            key="area_simulada",
-            label_visibility="collapsed"
+            "", value="", placeholder="Digite uma área para simulação (opcional)",
+            key="area_simulada", label_visibility="collapsed"
         )
         
         area_simulada_val = None
@@ -117,8 +94,6 @@ def render_filters(df_eaps, siglas_eaps):
                 area_simulada_val = float(str(area_simulada).replace('.', '').replace(',', '.'))
             except:
                 st.warning("Área simulada inválida. Use apenas números.")
-        else:
-            area_simulada_val = None
             
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -136,40 +111,64 @@ def apply_filters(df_eaps, filters, siglas_eaps):
     """Aplica os filtros no DataFrame"""
     filtered_df = df_eaps.copy()
 
-    # Filtro de obras por construtora (substring, case-insensitive)
-    if filters['construtora'] and 'Construtora' in filtered_df.columns:
-        mask = filtered_df['Construtora'].astype(str).apply(
-            lambda val: any(
-                str(filtro).strip().lower() in val.strip().lower()
-                for filtro in filters['construtora']
+    if filters.get('modo') == "Qualquer critério (OU/União)":
+        indices_finais = set()
+
+        # Filtro de construtora por substring
+        if filters.get('construtora') and 'Construtora' in filtered_df.columns:
+            mask = filtered_df['Construtora'].astype(str).apply(
+                lambda val: any(str(f).strip().lower() in val.strip().lower() 
+                              for f in filters['construtora'])
             )
-        )
-        filtered_df = filtered_df[mask]
+            indices_finais.update(filtered_df[mask].index)
 
-    # Filtro de obras por arquitetura (substring, case-insensitive)
-    if filters.get('arquitetura') and 'Arquitetura' in filtered_df.columns:
-        mask = filtered_df['Arquitetura'].astype(str).apply(
-            lambda val: any(
-                str(filtro).strip().lower() in val.strip().lower()
-                for filtro in filters['arquitetura']
+        # Filtro de arquitetura por substring
+        if filters.get('arquitetura') and 'Arquitetura' in filtered_df.columns:
+            mask = filtered_df['Arquitetura'].astype(str).apply(
+                lambda val: any(str(f).strip().lower() in val.strip().lower() 
+                              for f in filters['arquitetura'])
             )
-        )
-        filtered_df = filtered_df[mask]
+            indices_finais.update(filtered_df[mask].index)
 
-    # Filtro de obras (siglas)
-    if filters.get('obras') and len(filters['obras']) > 0 and 'Obras' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
+        # Se não há filtros aplicados, retorna todas as obras
+        if not indices_finais:
+            tem_filtros = ((filters.get('construtora') and len(filters['construtora']) > 0) or
+                          (filters.get('arquitetura') and len(filters['arquitetura']) > 0))
+            
+            if tem_filtros:
+                filtered_df = filtered_df.iloc[0:0]  # Retorna vazio se tem filtros mas sem resultado
+        else:
+            filtered_df = filtered_df.loc[list(indices_finais)]
 
-    # Filtro de área
-    if 'Area_Numeric' in filtered_df.columns and filters.get('area_range'):
-        filtered_df = filtered_df[
-            (filtered_df['Area_Numeric'] >= filters['area_range'][0]) & 
-            (filtered_df['Area_Numeric'] <= filters['area_range'][1])
-        ]
+    else:
+        # Modo AND
+        if filters.get('construtora') and 'Construtora' in filtered_df.columns:
+            mask = filtered_df['Construtora'].astype(str).apply(
+                lambda val: any(str(f).strip().lower() in val.strip().lower() 
+                              for f in filters['construtora'])
+            )
+            filtered_df = filtered_df[mask]
 
-    # Filtro de local
-    if filters.get('local'):
-        filtered_df = filtered_df[filtered_df['Local'].str.contains(filters['local'], case=False, na=False)]
+        if filters.get('arquitetura') and 'Arquitetura' in filtered_df.columns:
+            mask = filtered_df['Arquitetura'].astype(str).apply(
+                lambda val: any(str(f).strip().lower() in val.strip().lower() 
+                              for f in filters['arquitetura'])
+            )
+            filtered_df = filtered_df[mask]
+
+        if filters.get('obras') and len(filters['obras']) > 0 and 'Obras' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['Obras'].apply(
+                lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
+
+        if 'Area_Numeric' in filtered_df.columns and filters.get('area_range'):
+            filtered_df = filtered_df[
+                (filtered_df['Area_Numeric'] >= filters['area_range'][0]) & 
+                (filtered_df['Area_Numeric'] <= filters['area_range'][1])
+            ]
+
+        if filters.get('local'):
+            filtered_df = filtered_df[filtered_df['Local'].str.contains(
+                filters['local'], case=False, na=False)]
 
     return filtered_df, True
 
@@ -180,6 +179,7 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
     data_ref_dict = {}
     area_m2_dict_monday = {}
     
+    # Processa dados dos projetos
     for doc in _eaps_dados:
         projeto_id = doc.get("projeto_id")
         projeto_info = get_projeto_info_by_id(projeto_id, _projetos_dados)
@@ -187,6 +187,7 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
         siglas_obras_eap.add(sigla_obra)
         data_ref_dict[sigla_obra] = doc.get("dataBase", "")
     
+    # Processa áreas do Monday
     if _monday_df is not None and not _monday_df.empty:
         for idx, row in _monday_df.iterrows():
             nome_obra = str(row['Obras']).strip()
@@ -196,10 +197,11 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
     
     matriz_final = []
     
+    # Linha de área
     area_row = {"CÓDIGO": "", "DESCRIÇÃO": "ÁREA M²"}
     if selected_obras:
         for obra in selected_obras:
-            area_val = area_m2_dict_monday.get(obra, None)
+            area_val = area_m2_dict_monday.get(obra)
             if not area_val or str(area_val).strip().lower() in ["", "nan", "none"]:
                 for nome_monday, area_monday in area_m2_dict_monday.items():
                     if obra.lower() in nome_monday.lower():
@@ -209,6 +211,7 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
         area_row["Média"] = ""
     matriz_final.append(area_row)
     
+    # Linha de data base
     dataref_row = {"CÓDIGO": "", "DESCRIÇÃO": "DATA BASE"}
     if selected_obras:
         for sigla in selected_obras:
@@ -216,6 +219,7 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
         dataref_row["Média"] = ""
     matriz_final.append(dataref_row)
     
+    # Processa itens EAP
     codigos = set()
     descricoes = {}
     grupo_dict = {}
@@ -241,6 +245,7 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
                 grupo_dict[chave] = {}
             grupo_dict[chave][sigla_obra] = preco_m2
     
+    # Gera linhas da matriz
     for codigo in sorted(codigos):
         desc_original = descricoes.get(codigo, "")
         desc_limpa = re.sub(r"^Item\s*", "", desc_original, flags=re.IGNORECASE)
@@ -255,6 +260,7 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
                 valor = grupo_dict.get((codigo, descricoes.get(codigo, "")), {}).get(sigla, "")
                 valor_final = valor
                 
+                # Aplica INCC se disponível
                 if _incc_df_eap is not None and valor and str(valor).strip() not in ['', 'nan', 'none']:
                     try:
                         val_str = re.sub(r"[^0-9.,]", "", str(valor))
@@ -273,10 +279,7 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
                                         break
                             
                             try:
-                                if area_obra_str and str(area_obra_str).strip():
-                                    area_real = float(str(area_obra_str).replace('.', '').replace(',', '.'))
-                                else:
-                                    area_real = 1.0
+                                area_real = float(str(area_obra_str).replace('.', '').replace(',', '.')) if area_obra_str and str(area_obra_str).strip() else 1.0
                             except:
                                 area_real = 1.0
                             
@@ -328,32 +331,30 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             )
             
             nome_codigo, nome_descricao = "Código", "Descrição"
-            selecao_padrao = [True] * len(matriz_final)
             
             if 'selecao_linhas' not in st.session_state or len(st.session_state['selecao_linhas']) != len(matriz_final):
-                st.session_state['selecao_linhas'] = selecao_padrao.copy()
+                st.session_state['selecao_linhas'] = [True] * len(matriz_final)
             
+            # Configura DataFrame
             if selected_obras:
                 colunas = ["CÓDIGO", "DESCRIÇÃO"] + selected_obras + ["Média"]
                 df_matriz = pd.DataFrame(matriz_final)[colunas]
-                renomear = {"CÓDIGO": nome_codigo, "DESCRIÇÃO": nome_descricao}
-                df_matriz = df_matriz.rename(columns=renomear)
+                df_matriz = df_matriz.rename(columns={"CÓDIGO": nome_codigo, "DESCRIÇÃO": nome_descricao})
                 colunas_novas = [nome_codigo, nome_descricao] + selected_obras + ["Média"]
                 df_matriz = df_matriz[colunas_novas]
             else:
                 colunas = ["CÓDIGO", "DESCRIÇÃO"]
                 df_matriz = pd.DataFrame(matriz_final)[colunas]
-                renomear = {"CÓDIGO": nome_codigo, "DESCRIÇÃO": nome_descricao}
-                df_matriz = df_matriz.rename(columns=renomear)
-                colunas_novas = [nome_codigo, nome_descricao]
-                df_matriz = df_matriz[colunas_novas]
-            
+                df_matriz = df_matriz.rename(columns={"CÓDIGO": nome_codigo, "DESCRIÇÃO": nome_descricao})
+                
+            # Converte para string
             for obra in (selected_obras if selected_obras else []):
                 df_matriz[obra] = df_matriz[obra].astype(str)
                 
             if "Média" in df_matriz.columns:
                 df_matriz["Média"] = df_matriz["Média"].astype(str)
             
+            # Configuração das colunas
             column_config = {
                 "Selecionar": st.column_config.CheckboxColumn(label="Selecionar", width="small"),
                 nome_codigo: st.column_config.TextColumn(label=nome_codigo, width="small"),
@@ -367,25 +368,31 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             if "Média" in df_matriz.columns:
                 column_config["Média"] = st.column_config.TextColumn(label="Média", width="small")
             
+            # Preparação para exibição
             df_matriz_exibir = df_matriz.copy()
             selecao_linhas = st.session_state['selecao_linhas']
             idx_checkbox = [i for i in range(len(df_matriz_exibir)) if not (
                 (i == 0 and str(df_matriz_exibir.iloc[i,1]).strip().upper() == "ÁREA M²") or
                 (i == 1 and str(df_matriz_exibir.iloc[i,1]).strip().upper() == "DATA BASE")
             )]
+            
             selecao_col = [None]*len(df_matriz_exibir)
             for idx in idx_checkbox:
                 selecao_col[idx] = selecao_linhas[idx]
             df_matriz_exibir.insert(0, "Selecionar", selecao_col)
-            # Filtra para exibir apenas as linhas selecionadas (exceto cabeçalhos)
+            
+            # Filtra linhas selecionadas
             linhas_exibir = [i for i in range(len(df_matriz_exibir)) if (i < 2 or selecao_col[i])]
             df_matriz_exibir = df_matriz_exibir.iloc[linhas_exibir].reset_index(drop=True)
+            
             df_matriz_editada = st.data_editor(
                 df_matriz_exibir,
                 use_container_width=True,
                 column_config=column_config,
                 disabled=[col for col in df_matriz_exibir.columns if col != "Selecionar"]
             )
+            
+            # Atualiza seleção
             if "Selecionar" in df_matriz_editada.columns:
                 nova_selecao = st.session_state['selecao_linhas'][:]
                 mudou = False
@@ -401,6 +408,8 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                 st.session_state['selecao_linhas'] = nova_selecao
                 if mudou:
                     st.rerun()
+            
+            # Download Excel
             buffer = io.BytesIO()
             df_matriz.to_excel(buffer, index=False, engine='openpyxl')
             dados_bytes = buffer.getvalue()
@@ -411,52 +420,17 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            def copiar_coluna_media():
-                try:
-                    if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
-                        valores_media = []
-                        for idx, row in df_matriz_exibir.iterrows():
-                            if idx < 2:
-                                continue
-                            if row["Selecionar"]:
-                                val = row["Média"]
-                                if val and str(val).strip():
-                                    valores_media.append(str(val).strip())
-                        
-                        if valores_media:
-                            texto_copia = "\n".join(valores_media)
-                            try:
-                                import pyperclip
-                                pyperclip.copy(texto_copia)
-                                st.success(f"✅ Coluna Média copiada! {len(valores_media)} valores prontos para colar (Ctrl+V) em qualquer aplicativo!")
-                            except:
-                                import streamlit.components.v1 as components
-                                components.html(f"""
-                                <button onclick="navigator.clipboard.writeText(`{texto_copia}`).then(()=>document.getElementById('msg').innerHTML='✅ Copiado! Cole com Ctrl+V')" 
-                                style="background:#00cc88;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-weight:bold">
-                                Copiar {len(valores_media)} valores</button>
-                                <div id="msg" style="margin-top:10px;font-weight:bold"></div>
-                                """, height=80)
-                        else:
-                            st.warning("Nenhum valor marcado para copiar na coluna Média.")
-                    else:
-                        st.error("Coluna Média ou coluna Selecionar não encontrada.")
-                except Exception as e:
-                    st.error(f"Erro ao preparar coluna Média: {e}")
-            
+            # Botão de cópia
             from st_copy import copy_button
-            # Prepara o texto para copiar
             valores_media = []
             if "Média" in df_matriz.columns and "Selecionar" in df_matriz_exibir.columns:
                 for idx, row in df_matriz_exibir.iterrows():
-                    if idx < 2:
-                        continue
-                    if row["Selecionar"]:
+                    if idx >= 2 and row["Selecionar"]:
                         val = row["Média"]
                         if val and str(val).strip():
                             valores_media.append(str(val).strip())
+            
             texto_copia = "\n".join(valores_media) if valores_media else ""
-            # Alinhamento horizontal simples, botão e texto lado a lado
             col1, col2 = st.columns([0.1, 1])
             with col1:
                 st.write('Coluna Média')
@@ -489,10 +463,7 @@ def main():
     if df is not None and not df.empty:
         siglas_eaps = get_siglas_eaps()
         
-        if 'Obras' in df.columns:
-            df_eaps = df[df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in siglas_eaps)].copy()
-        else:
-            df_eaps = df.copy()
+        df_eaps = df[df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in siglas_eaps)].copy() if 'Obras' in df.columns else df.copy()
             
         filters = render_filters(df_eaps, siglas_eaps)
     else:
@@ -500,7 +471,10 @@ def main():
         filters = {'obras': []}
     
     filtered_df, _ = apply_filters(df_eaps, filters, siglas_eaps)
-    obras_filtradas = filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla")).unique().tolist()
+    if 'Obras' in filtered_df.columns:
+        obras_filtradas = filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla")).unique().tolist()
+    else:
+        obras_filtradas = []
     
     render_eap_section(obras_filtradas, filters.get('area_simulada_val'))
 
