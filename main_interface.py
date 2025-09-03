@@ -135,58 +135,43 @@ def render_filters(df_eaps, siglas_eaps):
 def apply_filters(df_eaps, filters, siglas_eaps):
     """Aplica os filtros no DataFrame"""
     filtered_df = df_eaps.copy()
-    filtro_aplicado = False
-    
-    if 'Area_Numeric' in df_eaps.columns and filters['area_range'] is not None:
+
+    # Filtro de obras por construtora (substring, case-insensitive)
+    if filters['construtora'] and 'Construtora' in filtered_df.columns:
+        mask = filtered_df['Construtora'].astype(str).apply(
+            lambda val: any(
+                str(filtro).strip().lower() in val.strip().lower()
+                for filtro in filters['construtora']
+            )
+        )
+        filtered_df = filtered_df[mask]
+
+    # Filtro de obras por arquitetura (substring, case-insensitive)
+    if filters.get('arquitetura') and 'Arquitetura' in filtered_df.columns:
+        mask = filtered_df['Arquitetura'].astype(str).apply(
+            lambda val: any(
+                str(filtro).strip().lower() in val.strip().lower()
+                for filtro in filters['arquitetura']
+            )
+        )
+        filtered_df = filtered_df[mask]
+
+    # Filtro de obras (siglas)
+    if filters.get('obras') and len(filters['obras']) > 0 and 'Obras' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
+
+    # Filtro de área
+    if 'Area_Numeric' in filtered_df.columns and filters.get('area_range'):
         filtered_df = filtered_df[
             (filtered_df['Area_Numeric'] >= filters['area_range'][0]) & 
             (filtered_df['Area_Numeric'] <= filters['area_range'][1])
         ]
-        filtro_aplicado = True
-        
-    if filters['local']:
+
+    # Filtro de local
+    if filters.get('local'):
         filtered_df = filtered_df[filtered_df['Local'].str.contains(filters['local'], case=False, na=False)]
-        filtro_aplicado = True
-    
-    if filters['obras'] is not None and len(filters['obras']) == 0 and 'Obras' in df_eaps.columns:
-        return filtered_df.iloc[0:0], True
-    
-    if filters['modo'] == "Todos os critérios (E/Interseção)":
-        # Aplicar filtro de obras com OR dentro do grupo (múltiplas obras permitidas)
-        if filters['obras'] and len(filters['obras']) > 0 and 'Obras' in df_eaps.columns:
-            filtered_df = filtered_df[filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
-            filtro_aplicado = True
-            
-        # Aplicar filtros de construtora e arquitetura com OR dentro de cada grupo
-        for filter_key, column in [('construtora', 'Construtora'), ('arquitetura', 'Arquitetura')]:
-            if filters[filter_key] and len(filters[filter_key]) > 0 and column in df_eaps.columns:
-                selected = [str(x).strip().lower() for x in filters[filter_key]]
-                filtered_df = filtered_df[
-                    filtered_df[column].astype(str).str.strip().str.lower().isin(selected)
-                ]
-                filtro_aplicado = True
-    else:
-        # Modo "Qualquer critério (OU/União)" - une os índices de todos os filtros aplicados
-        indices = set()
-        
-        # Filtro de obras
-        if filters['obras'] and len(filters['obras']) > 0 and 'Obras' in df_eaps.columns:
-            indices_obras = set(filtered_df[filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])].index)
-            indices.update(indices_obras)
-            
-        # Filtros de construtora e arquitetura
-        for filter_key, column in [('construtora', 'Construtora'), ('arquitetura', 'Arquitetura')]:
-            if filters[filter_key] and len(filters[filter_key]) > 0 and column in df_eaps.columns:
-                selected = [str(x).strip().lower() for x in filters[filter_key]]
-                mask = filtered_df[column].astype(str).str.strip().str.lower().isin(selected)
-                indices.update(set(filtered_df[mask].index))
-                
-        # Aplicar união de todos os índices encontrados
-        if indices:
-            filtered_df = filtered_df.loc[list(indices)]
-            filtro_aplicado = True
-            
-    return filtered_df, filtro_aplicado
+
+    return filtered_df, True
 
 @st.cache_data(ttl=180, show_spinner=True)
 def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df, _incc_df_eap, area_simulada_val=None):
