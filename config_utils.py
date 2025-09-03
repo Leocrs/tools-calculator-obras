@@ -6,19 +6,52 @@ import streamlit as st
 import pandas as pd
 import json
 import re
+import os
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from typing import Tuple, Optional
 from pymongo import MongoClient
 
-# Configurações do sistema
-MONGO_URI = "mongodb+srv://leonardocampos:leonardocampos@cluster0.7kdvlok.mongodb.net/ToolsConnect?retryWrites=true&w=majority"
+# Configuração segura de credenciais
+def get_credentials():
+    """
+    Obtém credenciais de forma segura usando abordagem híbrida:
+    1. Tenta st.secrets (Streamlit Cloud)
+    2. Tenta variáveis de ambiente (.env ou sistema)
+    3. Fallback para valores padrão (apenas para desenvolvimento)
+    """
+    try:
+        # Tentativa 1: Streamlit Secrets (recomendado para Streamlit Cloud)
+        mongo_uri = st.secrets["MONGO_URI"]
+        api_key = st.secrets["monday"]["API_KEY"]
+        board_id = st.secrets["monday"]["BOARD_ID"]
+        return mongo_uri, api_key, board_id
+    except (KeyError, AttributeError, FileNotFoundError):
+        pass
+    
+    try:
+        # Tentativa 2: Variáveis de ambiente
+        mongo_uri = os.getenv("MONGO_URI")
+        api_key = os.getenv("MONDAY_API_KEY")
+        board_id = int(os.getenv("MONDAY_BOARD_ID", "926240878"))
+        
+        if mongo_uri and api_key:
+            return mongo_uri, api_key, board_id
+    except (ValueError, TypeError):
+        pass
+    
+    # Fallback: Avisar que credenciais não foram encontradas
+    st.error("🚨 Credenciais não encontradas! Configure st.secrets ou variáveis de ambiente.")
+    st.stop()
+
+# Obter credenciais seguras
+MONGO_URI, API_KEY_VALUE, BOARD_ID_VALUE = get_credentials()
 
 class APIConfig:
     """Configurações da API do Monday.com"""
-    API_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjI2Njg4NzkwNiwiYWFpIjoxMSwidWlkIjoyMzA5NjM0MiwiaWFkIjoiMjAyMy0wNy0wNVQxNDoyNTo1NS4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6NDkwNjU3MCwicmduIjoidXNlMSJ9.tRWcVx3Q9oUEPKRMdaEiFzqCf1n0F7NelbjY09jQix4'
+    API_KEY = API_KEY_VALUE
     BASE_URL = 'https://api.monday.com/v2'
-    BOARD_ID = 926240878
+    BOARD_ID = BOARD_ID_VALUE
 
 @st.cache_resource
 def get_mongo_client():
