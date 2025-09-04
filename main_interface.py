@@ -396,15 +396,20 @@ def render_eap_section(selected_obras, area_simulada_val=None):
             if "Selecionar" in df_matriz_editada.columns:
                 nova_selecao = st.session_state['selecao_linhas'][:]
                 mudou = False
-                for idx in idx_checkbox:
-                    if idx < len(df_matriz_editada):
-                        novo_valor = bool(df_matriz_editada.loc[idx, "Selecionar"])
-                        if nova_selecao[idx] != novo_valor:
-                            nova_selecao[idx] = novo_valor
+                
+                # Mapeia os índices do dataframe editado para os índices originais
+                for i, linha_original_idx in enumerate(linhas_exibir):
+                    if i < len(df_matriz_editada) and linha_original_idx in idx_checkbox:
+                        novo_valor = bool(df_matriz_editada.loc[i, "Selecionar"])
+                        if nova_selecao[linha_original_idx] != novo_valor:
+                            nova_selecao[linha_original_idx] = novo_valor
                             mudou = True
+                
+                # Garante que as linhas de cabeçalho permaneçam sempre selecionadas
                 if len(nova_selecao) > 1:
                     nova_selecao[0] = True
                     nova_selecao[1] = True
+                    
                 st.session_state['selecao_linhas'] = nova_selecao
                 if mudou:
                     st.rerun()
@@ -472,7 +477,11 @@ def main():
     
     filtered_df, _ = apply_filters(df_eaps, filters, siglas_eaps)
     if 'Obras' in filtered_df.columns:
-        obras_filtradas = filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla")).unique().tolist()
+        todas_obras_filtradas = filtered_df['Obras'].apply(lambda x: clean_and_format(x, tipo="sigla")).unique().tolist()
+        if filters.get('obras') and len(filters['obras']) > 0:
+            obras_filtradas = [obra for obra in todas_obras_filtradas if obra in filters['obras']]
+        else:
+            obras_filtradas = todas_obras_filtradas
     else:
         obras_filtradas = []
     
