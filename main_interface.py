@@ -111,7 +111,7 @@ def apply_filters(df_eaps, filters, siglas_eaps):
     """Aplica os filtros no DataFrame"""
     filtered_df = df_eaps.copy()
 
-    # Primeiro aplicar filtros básicos que sempre se aplicam (independente do modo)
+    # Aplicar filtros básicos que sempre se aplicam (independente do modo)
     if 'Area_Numeric' in filtered_df.columns and filters.get('area_range'):
         filtered_df = filtered_df[
             (filtered_df['Area_Numeric'] >= filters['area_range'][0]) & 
@@ -122,11 +122,12 @@ def apply_filters(df_eaps, filters, siglas_eaps):
         filtered_df = filtered_df[filtered_df['Local'].str.contains(
             filters['local'], case=False, na=False)]
 
-    if filters.get('obras') and len(filters['obras']) > 0 and 'Obras' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['Obras'].apply(
-            lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
-
     if filters.get('modo') == "Qualquer critério (OU/União)":
+        # No modo OR, aplicar filtro de obras primeiro
+        if filters.get('obras') and len(filters['obras']) > 0 and 'Obras' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['Obras'].apply(
+                lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
+
         indices_finais = set()
 
         # Filtro de construtora por substring
@@ -156,20 +157,49 @@ def apply_filters(df_eaps, filters, siglas_eaps):
             filtered_df = filtered_df.loc[list(indices_finais)]
 
     else:
-        # Modo AND
-        if filters.get('construtora') and 'Construtora' in filtered_df.columns:
-            mask = filtered_df['Construtora'].astype(str).apply(
-                lambda val: any(str(f).strip().lower() in val.strip().lower() 
-                              for f in filters['construtora'])
-            )
-            filtered_df = filtered_df[mask]
-
-        if filters.get('arquitetura') and 'Arquitetura' in filtered_df.columns:
-            mask = filtered_df['Arquitetura'].astype(str).apply(
-                lambda val: any(str(f).strip().lower() in val.strip().lower() 
-                              for f in filters['arquitetura'])
-            )
-            filtered_df = filtered_df[mask]
+        # Modo AND - INTERSEÇÃO REAL: só mostra registros que atendem TODOS os campos preenchidos
+        
+        # Se pelo menos um campo de filtro está preenchido, começar com conjunto vazio e fazer interseção
+        campos_preenchidos = []
+        if filters.get('obras') and len(filters['obras']) > 0:
+            campos_preenchidos.append('obras')
+        if filters.get('construtora') and len(filters['construtora']) > 0:
+            campos_preenchidos.append('construtora')
+        if filters.get('arquitetura') and len(filters['arquitetura']) > 0:
+            campos_preenchidos.append('arquitetura')
+        
+        if campos_preenchidos:
+            # Para modo AND verdadeiro, cada registro deve atender TODOS os campos selecionados
+            indices_and = None
+            
+            # Filtro de obras
+            if 'obras' in campos_preenchidos and 'Obras' in filtered_df.columns:
+                mask_obras = filtered_df['Obras'].apply(
+                    lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])
+                indices_obras = set(filtered_df[mask_obras].index)
+                indices_and = indices_obras if indices_and is None else indices_and.intersection(indices_obras)
+            
+            # Filtro de construtora 
+            if 'construtora' in campos_preenchidos and 'Construtora' in filtered_df.columns:
+                mask_const = filtered_df['Construtora'].astype(str).apply(
+                    lambda val: any(str(f).strip().lower() in val.strip().lower() 
+                                  for f in filters['construtora'])
+                )
+                indices_const = set(filtered_df[mask_const].index)
+                indices_and = indices_const if indices_and is None else indices_and.intersection(indices_const)
+            
+            # Filtro de arquitetura
+            if 'arquitetura' in campos_preenchidos and 'Arquitetura' in filtered_df.columns:
+                mask_arq = filtered_df['Arquitetura'].astype(str).apply(
+                    lambda val: any(str(f).strip().lower() in val.strip().lower() 
+                                  for f in filters['arquitetura'])
+                )
+                indices_arq = set(filtered_df[mask_arq].index)
+                indices_and = indices_arq if indices_and is None else indices_and.intersection(indices_arq)
+            
+            # Aplicar resultado da interseção
+            if indices_and is not None:
+                filtered_df = filtered_df.loc[list(indices_and)] if indices_and else filtered_df.iloc[0:0]
 
     return filtered_df, True
 
@@ -216,7 +246,31 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
     dataref_row = {"CÓDIGO": "", "DESCRIÇÃO": "DATA BASE"}
     if selected_obras:
         for sigla in selected_obras:
-            dataref_row[sigla] = str(data_ref_dict.get(sigla, ""))
+            data_original = data_ref_dict.get(sigla, "")
+            # Formatar data para exibir apenas MM/YYYY (apenas visual)
+            if data_original:
+                try:
+                    from datetime import datetime
+                    import pandas as pd
+                    # Tenta converter usando pandas para maior flexibilidade
+                    data_parsed = pd.to_datetime(data_original)
+                    data_formatada = data_parsed.strftime("%m/%Y")
+                except:
+                    try:
+                        # Fallback: tenta converter manualmente
+                        if isinstance(data_original, str) and len(data_original) >= 10:
+                            # Pega apenas a parte da data (YYYY-MM-DD)
+                            date_part = data_original[:10]
+                            data_parsed = datetime.strptime(date_part, "%Y-%m-%d")
+                            data_formatada = data_parsed.strftime("%m/%Y")
+                        else:
+                            data_formatada = str(data_original)
+                    except:
+                        # Se tudo falhar, mantém original
+                        data_formatada = str(data_original)
+            else:
+                data_formatada = ""
+            dataref_row[sigla] = data_formatada
         dataref_row["Média"] = ""
     matriz_final.append(dataref_row)
     
