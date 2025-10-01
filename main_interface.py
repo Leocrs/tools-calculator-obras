@@ -21,7 +21,7 @@ def create_multiselect_filter(label, options_base, key):
         st.session_state[key] = []
         
     st.multiselect(
-        "", options_base, key=key,
+        f"Filtro {key}", options_base, key=key,
         label_visibility="collapsed",
         placeholder="Escolha uma opção"
     )
@@ -57,7 +57,7 @@ def render_filters(df_eaps, siglas_eaps):
             if not valid_areas.empty:
                 min_area, max_area = 0, int(valid_areas.max())
                 area_range = st.slider(
-                    "", min_value=min_area, max_value=max_area, 
+                    "Filtro de área", min_value=min_area, max_value=max_area, 
                     value=(min_area, max_area), step=100, 
                     key="area", label_visibility="collapsed", format="%d m²"
                 )
@@ -65,7 +65,7 @@ def render_filters(df_eaps, siglas_eaps):
     with col2:
         st.markdown('<div class="filter-label">LOCAL</div>', unsafe_allow_html=True)
         local_filter = st.selectbox(
-            "", options=locais_opcoes, key="local",
+            "Filtro local", options=locais_opcoes, key="local",
             placeholder="Escolha uma opção", label_visibility="collapsed", index=None
         )
         
@@ -84,7 +84,7 @@ def render_filters(df_eaps, siglas_eaps):
     with col6:
         st.markdown('<div class="filter-label">Simular valores para área (m²):</div>', unsafe_allow_html=True)
         area_simulada = st.text_input(
-            "", value="", placeholder="Digite uma área para simulação (opcional)",
+            "Área para simulação", value="", placeholder="Digite uma área para simulação (opcional)",
             key="area_simulada", label_visibility="collapsed"
         )
         
@@ -110,6 +110,21 @@ def render_filters(df_eaps, siglas_eaps):
 def apply_filters(df_eaps, filters, siglas_eaps):
     """Aplica os filtros no DataFrame"""
     filtered_df = df_eaps.copy()
+
+    # Primeiro aplicar filtros básicos que sempre se aplicam (independente do modo)
+    if 'Area_Numeric' in filtered_df.columns and filters.get('area_range'):
+        filtered_df = filtered_df[
+            (filtered_df['Area_Numeric'] >= filters['area_range'][0]) & 
+            (filtered_df['Area_Numeric'] <= filters['area_range'][1])
+        ]
+
+    if filters.get('local'):
+        filtered_df = filtered_df[filtered_df['Local'].str.contains(
+            filters['local'], case=False, na=False)]
+
+    if filters.get('obras') and len(filters['obras']) > 0 and 'Obras' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['Obras'].apply(
+            lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
 
     if filters.get('modo') == "Qualquer critério (OU/União)":
         indices_finais = set()
@@ -155,20 +170,6 @@ def apply_filters(df_eaps, filters, siglas_eaps):
                               for f in filters['arquitetura'])
             )
             filtered_df = filtered_df[mask]
-
-        if filters.get('obras') and len(filters['obras']) > 0 and 'Obras' in filtered_df.columns:
-            filtered_df = filtered_df[filtered_df['Obras'].apply(
-                lambda x: clean_and_format(x, tipo="sigla") in filters['obras'])]
-
-        if 'Area_Numeric' in filtered_df.columns and filters.get('area_range'):
-            filtered_df = filtered_df[
-                (filtered_df['Area_Numeric'] >= filters['area_range'][0]) & 
-                (filtered_df['Area_Numeric'] <= filters['area_range'][1])
-            ]
-
-        if filters.get('local'):
-            filtered_df = filtered_df[filtered_df['Local'].str.contains(
-                filters['local'], case=False, na=False)]
 
     return filtered_df, True
 
