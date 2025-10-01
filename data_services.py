@@ -132,7 +132,7 @@ def _convert_area(area_str):
         return 0.0
 
 @st.cache_data(ttl=3600, show_spinner=False) # Cache reduzido para 1 hora
-def get_eap_data(filter_version=10):  # Versão do filtro para forçar limpeza do cache
+def get_eap_data(filter_version=11):  # Versão do filtro para forçar limpeza do cache
     """Busca dados de EAP e projetos do MongoDB"""
     eaps_collection = get_eaps_collection()
     projetos_collection = get_projetos_collection()
@@ -164,21 +164,21 @@ def get_eap_data(filter_version=10):  # Versão do filtro para forçar limpeza d
             try:
                 codigo_str = str(codEAP).strip()
                 
-                # FILTRO ULTRA ESPECÍFICO: apenas códigos 00.001 até 00.041
+                # FILTRO ULTRA ESPECÍFICO: apenas códigos 00.001 até 00.042
                 if '.' in codigo_str:
-                    # Para códigos como "00.001", "00.041", etc.
+                    # Para códigos como "00.001", "00.042", etc.
                     parts = codigo_str.split('.')
                     if len(parts) >= 2:
                         parte_principal = parts[0]  # Manter zeros à esquerda
                         parte_secundaria = parts[1]
                         
-                        # Verificar formato EXATO: 00.001 até 00.041
+                        # Verificar formato EXATO: 00.001 até 00.042
                         if (parte_principal == '00' and 
                             len(parte_secundaria) == 3 and  # Deve ter exatamente 3 dígitos
                             parte_secundaria.isdigit()):
                             
                             codigo_num = int(parte_secundaria)
-                            if 1 <= codigo_num <= 41:
+                            if 1 <= codigo_num <= 42:
                                 itens_filtrados.append(item)
                             # Fora do range 001-041: filtrado
                         # Outros formatos (00.01, 00.25, etc.): filtrados
