@@ -321,7 +321,7 @@ def process_eap_matrix(_eaps_dados, _projetos_dados, selected_obras, _monday_df,
 def render_eap_section(selected_obras, area_simulada_val=None):
     """Renderiza a seção principal EAP"""
     try:
-        eaps_dados, projetos_dados = get_eap_data()
+        eaps_dados, projetos_dados = get_eap_data(filter_version=9)
         incc_df_eap = load_incc_data()
         
         if eaps_dados:
@@ -436,10 +436,9 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                             valores_media.append(str(val).strip())
             
             texto_copia = "\n".join(valores_media) if valores_media else ""
-            col1, col2 = st.columns([0.1, 1])
-            with col1:
+            col = st.columns(1)[0]
+            with col:
                 st.write('Coluna Média')
-            with col2:
                 copy_button(
                     texto_copia,
                     icon='material_symbols',
@@ -459,6 +458,10 @@ def main():
     setup_page()
     render_header()
     
+    # Inicializar variáveis para evitar UnboundLocalError
+    df_eaps = pd.DataFrame()
+    siglas_eaps = []
+    
     try:
         board_name, df = get_monday_data()
     except Exception as e:
@@ -472,8 +475,11 @@ def main():
             
         filters = render_filters(df_eaps, siglas_eaps)
     else:
-        st.info("Nenhum dado encontrado. Verifique a conexão com o Monday.com.")
+        st.error("🚨 Nenhum dado encontrado. Verifique a conexão com o Monday.com.")
+        st.info("💡 Verifique se suas credenciais estão corretas em .streamlit/secrets.toml")
         filters = {'obras': []}
+        # Retornar early para evitar processamento adicional quando não há dados
+        return
     
     filtered_df, _ = apply_filters(df_eaps, filters, siglas_eaps)
     if 'Obras' in filtered_df.columns:
