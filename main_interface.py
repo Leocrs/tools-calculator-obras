@@ -436,10 +436,9 @@ def render_eap_section(selected_obras, area_simulada_val=None):
                             valores_media.append(str(val).strip())
             
             texto_copia = "\n".join(valores_media) if valores_media else ""
-            col1, col2 = st.columns([0.1, 1])
-            with col1:
-                st.write('Coluna Média')
-            with col2:
+            col = st.columns(1)[0]
+            with col:
+                st.write('Coluna Média', end=' ')
                 copy_button(
                     texto_copia,
                     icon='material_symbols',
