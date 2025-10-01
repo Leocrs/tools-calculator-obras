@@ -41,8 +41,12 @@ def get_monday_data() -> Tuple[Optional[str], Optional[pd.DataFrame]]:
             headers={'Authorization': APIConfig.API_KEY, 'Content-Type': 'application/json'}
         )
         
-        if response.status_code != 200:
-            st.error(f"Erro HTTP {response.status_code}")
+        if response.status_code == 401:
+            st.error("🚨 Erro HTTP 401: API Key inválido! Verifique suas credenciais no arquivo .streamlit/secrets.toml")
+            st.info("💡 Dica: Acesse https://monday.com/developers/apps para obter um API Key válido")
+            return None, None
+        elif response.status_code != 200:
+            st.error(f"Erro HTTP {response.status_code}: Falha na comunicação com Monday.com")
             return None, None
             
         data = response.json()
@@ -127,13 +131,74 @@ def _convert_area(area_str):
     except:
         return 0.0
 
-@st.cache_data(ttl=86400, show_spinner=False)
-def get_eap_data():
+@st.cache_data(ttl=3600, show_spinner=False) # Cache reduzido para 1 hora
+def get_eap_data(filter_version=10):  # Versão do filtro para forçar limpeza do cache
     """Busca dados de EAP e projetos do MongoDB"""
     eaps_collection = get_eaps_collection()
     projetos_collection = get_projetos_collection()
     
-    eaps_dados = list(eaps_collection.find({}))
+    # Buscar todos os dados
+    eaps_dados_raw = list(eaps_collection.find({}))
+    
+    # Aplicar filtro nos ITENS dentro de cada documento
+    eaps_dados = []
+    total_itens_original = 0
+    total_itens_filtrados = 0
+    
+    for eap in eaps_dados_raw:
+        # Fazer uma cópia do documento para não modificar o original
+        eap_filtrado = eap.copy()
+        itens_originais = eap.get('itens', [])
+        total_itens_original += len(itens_originais)
+        
+        # Filtrar os itens dentro do documento
+        itens_filtrados = []
+        for item in itens_originais:
+            codEAP = item.get('codEAP', '')
+            
+            if not codEAP:
+                # Se não tem código, manter
+                itens_filtrados.append(item)
+                continue
+                
+            try:
+                codigo_str = str(codEAP).strip()
+                
+                # FILTRO ULTRA ESPECÍFICO: apenas códigos 00.001 até 00.041
+                if '.' in codigo_str:
+                    # Para códigos como "00.001", "00.041", etc.
+                    parts = codigo_str.split('.')
+                    if len(parts) >= 2:
+                        parte_principal = parts[0]  # Manter zeros à esquerda
+                        parte_secundaria = parts[1]
+                        
+                        # Verificar formato EXATO: 00.001 até 00.041
+                        if (parte_principal == '00' and 
+                            len(parte_secundaria) == 3 and  # Deve ter exatamente 3 dígitos
+                            parte_secundaria.isdigit()):
+                            
+                            codigo_num = int(parte_secundaria)
+                            if 1 <= codigo_num <= 41:
+                                itens_filtrados.append(item)
+                            # Fora do range 001-041: filtrado
+                        # Outros formatos (00.01, 00.25, etc.): filtrados
+                else:
+                    # Códigos sem ponto: filtrados
+                    pass
+                    
+            except (ValueError, TypeError):
+                # Se não conseguir converter, manter por segurança
+                itens_filtrados.append(item)
+        
+        # Atualizar o documento com os itens filtrados
+        eap_filtrado['itens'] = itens_filtrados
+        total_itens_filtrados += len(itens_filtrados)
+        eaps_dados.append(eap_filtrado)
+    
+    # Logs simplificados
+    itens_removidos = total_itens_original - total_itens_filtrados
+    if itens_removidos > 0:
+        print(f"✅ Filtro aplicado: {itens_removidos} itens indesejados removidos")
     
     def clean_mongo_field(val):
         if val is None or pd.isna(val) or str(val).strip().lower() in ['none', 'nan', '']:
