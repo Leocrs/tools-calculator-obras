@@ -6,6 +6,12 @@ on:
     - cron: '0 7 2 * *'
   workflow_dispatch:
 
+# IMPORTANTE: Este workflow requer um Personal Access Token (PAT) configurado
+# Para configurar:
+# 1. Acesse Settings > Secrets and variables > Actions
+# 2. Crie um novo secret chamado 'GH_PAT'
+# 3. O PAT deve ter permissão de escrita no repositório (scope: repo)
+
 jobs:
   update-incc:
     runs-on: ubuntu-latest
@@ -13,7 +19,7 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
 
       - name: Configura Python
         uses: actions/setup-python@v5
@@ -37,5 +43,5 @@ jobs:
             echo "Nenhuma alteração para commit."
           else
             git commit -m "Atualização automática do índice INCC - $(date +'%Y-%m-%d')"
-            git push
+            git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/Leocrs/tools-calculator-obras.git HEAD:main
           fi
