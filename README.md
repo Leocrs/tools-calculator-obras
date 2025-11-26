@@ -20,13 +20,22 @@ Dados como EAPs, projetos e índices INCC mudam com pouca frequência. TTLs mais
 
 ---
 
-# TOOLS Calculator
+## TOOLS Calculator
 
 Sistema para análise de obras com cálculos de INCC (Índice Nacional da Construção Civil).
 
 ## Estrutura do Projeto
 
-```
+tools-calculator-obras/
+├── config_utils.py          # Configurações e utilitários
+├── data_services.py         # Serviços de dados (MongoDB, Monday.com)
+├── main_interface.py        # Interface principal da aplicação
+├── incc_collector.py        # Coleta de dados do INCC
+├── dados_dia01_indice.csv   # Base de dados histórica do INCC
+├── requirements.txt         # Dependências do projeto
+└── README.md                # Este arquivo
+
+```plaintext
 tools-calculator-obras/
 ├── config_utils.py          # Configurações e utilitários
 ├── data_services.py         # Serviços de dados (MongoDB, Monday.com)
