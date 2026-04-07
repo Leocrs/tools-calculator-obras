@@ -50,10 +50,10 @@ tools-calculator-obras/
 
 ### 1. `config_utils.py`
 
-- Configurações do sistema (MongoDB, Monday.com)
-- Funções utilitárias para formatação de dados
-- Cálculos de valores ajustados pelo INCC
-- Configuração da interface Streamlit
+- Configurações do sistema (MongoDB, Monday.com).
+- Funções utilitárias para formatação de dados.
+- Cálculos de valores ajustados pelo INCC.
+- Configuração da interface Streamlit.
 
 ### 2. `data_services.py`
 
@@ -62,7 +62,7 @@ tools-calculator-obras/
 - Processamento de dados de EAP
 - Carregamento de dados do INCC
 
-## 3. `main_interface.py`
+### 3. `main_interface.py`
 
 - Interface principal do usuário
 - Sistema de filtros
@@ -90,7 +90,7 @@ tools-calculator-obras/
 - ✅ Interface profissional e responsiva
 - ✅ Exportação para Excel
 - ✅ Cópia de dados para área de transferência
-- ✅ Simulação de valores por área
+- ✅ Simulação de valores por área.
 
 ## Tecnologias
 
